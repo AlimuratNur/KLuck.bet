@@ -1,0 +1,16 @@
+# Rust / Anchor
+contracts/target/
+contracts/.anchor/
+contracts/node_modules/
+**/test-ledger/
+
+# .NET
+web/bin/
+web/obj/
+.vs/
+.idea/
+
+# Secrets: never commit these
+*.keypair.json
+id.json
+.env

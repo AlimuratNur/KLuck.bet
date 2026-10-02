@@ -1,0 +1,48 @@
+﻿@page "/"
+@using PolymarketApp.Services
+@using Solnet.Rpc
+@inject WalletService Wallet
+@inject IRpcClient Rpc
+
+<h1>Prediction Markets (devnet)</h1>
+
+@if (Wallet.Address is null)
+{
+    <button class="btn btn-primary" @onclick="Connect">Connect Phantom</button>
+}
+else
+{
+    <p>Connected: <code>@Wallet.Address</code></p>
+    <p>Balance: @(balance?.ToString("F4") ?? "...") SOL</p>
+    <button class="btn btn-secondary" @onclick="Disconnect">Disconnect</button>
+}
+
+@if (error is not null)
+{
+    <p class="text-danger">@error</p>
+}
+
+@code {
+    double? balance;
+    string? error;
+
+    protected override void OnInitialized() => Wallet.Changed += StateHasChanged;
+
+    async Task Connect()
+    {
+        try
+        {
+            error = null;
+            await Wallet.ConnectAsync();
+            var res = await Rpc.GetBalanceAsync(Wallet.Address!);
+            balance = res.WasSuccessful ? res.Result.Value / 1_000_000_000.0 : null;
+        }
+        catch (Exception e) { error = e.Message; }
+    }
+
+    async Task Disconnect()
+    {
+        await Wallet.DisconnectAsync();
+        balance = null;
+    }
+}

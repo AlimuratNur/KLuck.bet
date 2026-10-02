@@ -1,0 +1,77 @@
+@page "/markets"
+@using PolymarketApp.Services
+@inject WalletService Wallet
+@inject SolanaService Solana
+
+<h1>Markets</h1>
+
+@if (Wallet.Address is null)
+{
+    <p>Connect your wallet on the <a href="/">home page</a> first.</p>
+}
+else
+{
+    <h4>Create a market</h4>
+    <div class="mb-3">
+        <input class="form-control mb-2" placeholder="Question, e.g. Will BTC be above 100k on Friday?" @bind="question" />
+        <input class="form-control mb-2" type="number" placeholder="Ends in (minutes)" @bind="minutes" />
+        <input class="form-control mb-2" type="number" placeholder="Initial liquidity (test tokens)" @bind="liquidity" />
+        <button class="btn btn-primary" @onclick="Create" disabled="@busy">Create market</button>
+    </div>
+}
+
+@if (message is not null) { <p>@((MarkupString)message)</p> }
+
+<h4>All markets</h4>
+<button class="btn btn-secondary mb-2" @onclick="Load">Refresh</button>
+
+@if (markets is null) { <p>Loading...</p> }
+else if (markets.Count == 0) { <p>No markets yet.</p> }
+else
+{
+    <table class="table">
+        <thead><tr><th>Question</th><th>YES</th><th>NO</th><th>Ends</th><th>Status</th></tr></thead>
+        <tbody>
+        @foreach (var m in markets)
+        {
+            <tr>
+                <td><a href="/market/@m.Address">@m.Question</a><br /><small><code>@m.Address</code></small></td>
+                <td>@m.YesPrice.ToString("P0")</td>
+                <td>@m.NoPrice.ToString("P0")</td>
+                <td>@DateTimeOffset.FromUnixTimeSeconds(m.EndTime).LocalDateTime.ToString("g")</td>
+                <td>@(m.Resolved ? $"Resolved: {(m.Winner == 0 ? "YES" : "NO")}" : "Open")</td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    List<MarketInfo>? markets;
+    string question = "";
+    int minutes = 10;
+    decimal liquidity = 100;
+    bool busy;
+    string? message;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    async Task Load()
+    {
+        try { markets = await Solana.GetMarketsAsync(); }
+        catch (Exception e) { message = $"Load error: {e.Message}"; }
+    }
+
+    async Task Create()
+    {
+        try
+        {
+            busy = true; message = null;
+            var end = DateTimeOffset.UtcNow.AddMinutes(minutes).ToUnixTimeSeconds();
+            var sig = await Solana.CreateMarketAsync(question, end, liquidity);
+            message = $"Sent! <a target='_blank' href='https://explorer.solana.com/tx/{sig}?cluster=devnet'>View transaction</a>. Wait about 10 seconds, then press Refresh.";
+        }
+        catch (Exception e) { message = $"Error: {e.Message}"; }
+        finally { busy = false; }
+    }
+}

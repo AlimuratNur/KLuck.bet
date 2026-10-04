@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KLuck.bet — Trade on what happens next</title>
+<style>
+:root{--bg:#f4f1fb;--fg:#17142a;--mut:#645f7d;--a:#7c3aed;--b:#06b6d4;--c:#f43f5e;--ok:#10b981;--card:#fff;--bd:#ddd8ee;--glow:.16;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e0c1a;--fg:#f3f1ff;--mut:#a9a4c4;--card:#191630;--bd:#2d2950;--glow:.28}}
+:root[data-theme="dark"]{--bg:#0e0c1a;--fg:#f3f1ff;--mut:#a9a4c4;--card:#191630;--bd:#2d2950;--glow:.28}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
+body:before{content:"";position:fixed;inset:0;pointer-events:none;background:radial-gradient(60vmax 40vmax at 90% -10%,color-mix(in srgb,var(--a) calc(var(--glow)*100%),transparent),transparent),radial-gradient(50vmax 40vmax at -10% 110%,color-mix(in srgb,var(--b) calc(var(--glow)*100%),transparent),transparent)}
+.deck{height:100%;display:flex;flex-direction:column;position:relative}
+.prog{height:3px;background:var(--bd)}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .4s}
+.slides{flex:1;position:relative;overflow:hidden}
+.slide{position:absolute;inset:0;padding:5vh 7vw;display:none;flex-direction:column;justify-content:center;overflow-y:auto}
+.slide.on{display:flex}
+.slide.on>*{animation:in .55s cubic-bezier(.2,.7,.2,1) both}
+.slide.on>*:nth-child(2){animation-delay:.07s}.slide.on>*:nth-child(3){animation-delay:.14s}.slide.on>*:nth-child(4){animation-delay:.21s}.slide.on>*:nth-child(5){animation-delay:.28s}
+@keyframes in{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.g{background:linear-gradient(100deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+h1{font-size:clamp(40px,8.5vw,104px);margin:0 0 14px;line-height:1;letter-spacing:-.035em}
+h2{font-size:clamp(26px,4.4vw,52px);margin:0 0 8px;line-height:1.08;letter-spacing:-.02em}
+.sub{font-size:clamp(15px,2vw,22px);color:var(--mut);margin:0 0 22px;max-width:46em;line-height:1.4}
+.tag{display:inline-block;font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--b);margin-bottom:10px;font-weight:700}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:16px;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-3px);border-color:var(--a)}
+.card .e{font-size:30px}.card b{display:block;margin:6px 0 4px;font-size:clamp(16px,1.8vw,20px)}
+.card p{margin:0;font-size:clamp(13px,1.5vw,16px);color:var(--mut);line-height:1.45}
+.flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.step{flex:1;min-width:150px;background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:14px;text-align:center}
+.step .n{width:34px;height:34px;border-radius:50%;margin:0 auto 8px;display:grid;place-items:center;color:#fff;font-weight:800;background:linear-gradient(135deg,var(--a),var(--b))}
+.step p{margin:0;font-size:clamp(13px,1.5vw,16px)}
+.arr{color:var(--mut);font-size:22px}
+.pill{display:inline-block;background:var(--card);border:1px solid var(--bd);border-radius:999px;padding:6px 14px;font-size:clamp(13px,1.5vw,16px);margin:0 6px 6px 0}
+.pbar{height:40px;border-radius:20px;overflow:hidden;display:flex;border:1px solid var(--bd);font-weight:800;font-size:16px}
+.pbar div{display:flex;align-items:center;padding:0 16px;color:#fff;transition:width .3s;white-space:nowrap;overflow:hidden}
+.yes{background:var(--ok)}.no{background:var(--c)}
+.seg{display:inline-flex;border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:14px 0 0}
+.seg button{background:var(--card);color:var(--fg);border-radius:0;padding:8px 22px;font-weight:700}
+.seg button.on.y{background:var(--ok);color:#fff}.seg button.on.n{background:var(--c);color:#fff}
+input[type=range]{width:100%;accent-color:var(--a);margin:14px 0 6px}
+.q{font-size:clamp(18px,2.6vw,30px);font-weight:700;margin:0 0 14px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+.stats .card{padding:12px;text-align:center}.stats b{font-size:clamp(18px,3vw,30px);margin:0}.stats p{margin:2px 0 0}
+.code{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px 18px;font-family:ui-monospace,Consolas,monospace;font-size:clamp(14px,2vw,22px);line-height:1.7;margin:0 0 16px}
+.warn{display:inline-block;margin-top:14px;font-size:clamp(12px,1.4vw,15px);color:var(--c);border:1px solid var(--c);border-radius:10px;padding:6px 12px}
+.road{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}
+.road .card ul{margin:6px 0 0;padding-left:18px;color:var(--mut);font-size:clamp(13px,1.5vw,16px);line-height:1.6}
+.road .done{border-color:var(--ok)}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;gap:12px;position:relative}
+.dots{display:flex;gap:6px}.dots i{width:8px;height:8px;border-radius:50%;background:var(--bd);cursor:pointer;transition:all .25s}.dots i.on{background:var(--a);width:22px;border-radius:5px}
+.cnt{font-size:13px;color:var(--mut);min-width:44px;text-align:center}
+button{background:linear-gradient(135deg,var(--a),var(--b));color:#fff;border:0;border-radius:10px;padding:8px 18px;font-size:16px;cursor:pointer;font-family:inherit}
+button:disabled{opacity:.3;cursor:default}
+@media (prefers-reduced-motion:reduce){.slide.on>*{animation:none}*{transition:none!important}}
+</style></head><body>
+<div class="deck"><div class="prog"><i id="pg"></i></div><div class="slides">
+
+<section class="slide">
+<div class="tag">Hackathon submission · Built on Solana</div>
+<h1><span class="g">KLuck</span>.bet</h1>
+<p class="sub">Trade on what happens next. If you think you know the future, now you can back it up.</p>
+<div><span class="pill">🚗 City life</span><span class="pill">🌦️ Weather</span><span class="pill">🎓 Campus</span><span class="pill">🎬 Pop culture</span><span class="pill">🚀 Tech &amp; crypto</span></div>
+<p class="sub" style="margin-top:18px">Prediction markets, made simple.</p>
+</section>
+
+<section class="slide">
+<div class="tag">The problem</div>
+<h2>Opinions are free. <span class="g">Backing them</span> is hard</h2>
+<div class="grid">
+<div class="card"><div class="e">🏛️</div><b>Centralized platforms</b><p>Someone else holds your funds and can change the rules.</p></div>
+<div class="card"><div class="e">🧊</div><b>Thin markets</b><p>Order books need lots of traders, so small communities get nothing.</p></div>
+<div class="card"><div class="e">🔒</div><b>Closed topics</b><p>Only big global events get a market. Local questions are ignored.</p></div>
+<div class="card"><div class="e">🧾</div><b>Unclear payouts</b><p>It is hard to know what a winning bet is really worth.</p></div>
+</div>
+</section>
+
+<section class="slide">
+<div class="tag">Our solution</div>
+<h2>Every question has a <span class="g">price</span></h2>
+<p class="sub">On KLuck.bet, the price of YES is the crowd's honest guess at the odds. No pundits, just people putting something behind what they believe.</p>
+<div class="flow">
+<div class="step"><div class="n">1</div><p>Someone asks: "Will it snow in Almaty before November?"</p></div><span class="arr">→</span>
+<div class="step"><div class="n">2</div><p>You pick YES or NO and buy shares</p></div><span class="arr">→</span>
+<div class="step"><div class="n">3</div><p>The event happens and the result is confirmed</p></div><span class="arr">→</span>
+<div class="step"><div class="n">4</div><p>Each winning share pays 1 token</p></div>
+</div>
+</section>
+
+<section class="slide">
+<div class="tag">Try it · pick a side, drag the slider</div>
+<h2>Watch the odds move</h2>
+<p class="q">Will it be a sunny day for the campus festival?</p>
+<div class="pbar"><div class="yes" id="py" style="width:50%">YES 50%</div><div class="no" id="pn" style="width:50%">NO 50%</div></div>
+<div class="seg"><button class="on y" id="sy">Buy YES</button><button class="n" id="sn">Buy NO</button></div>
+<input type="range" id="rg" min="0" max="300" value="0" aria-label="Amount to spend">
+<p class="sub" id="out" style="margin:0 0 4px">Nobody has bet yet, so it is a coin flip: 50%.</p>
+<div class="stats">
+<div class="card"><b id="s1">–</b><p>Shares you get</p></div>
+<div class="card"><b id="s2">–</b><p>Payout if you win</p></div>
+<div class="card"><b id="s3">–</b><p>Profit if you win</p></div>
+</div>
+</section>
+
+<section class="slide">
+<div class="tag">Who it's for</div>
+<h2>Real life, <span class="g">real questions</span></h2>
+<p class="sub">If people argue about it, it can be a market.</p>
+<div class="grid">
+<div class="card"><div class="e">🚗</div><b>City life</b><p>"Will Tole Bi street be jammed at 6 PM on Friday?"</p></div>
+<div class="card"><div class="e">🏔️</div><b>Weather &amp; mountains</b><p>"Will Shymbulak have snow before November 1?"</p></div>
+<div class="card"><div class="e">🎓</div><b>Campus</b><p>"Will the hackathon get more than 200 teams?"</p></div>
+<div class="card"><div class="e">🚀</div><b>Tech</b><p>"Will the new iPhone reach Almaty stores before December?"</p></div>
+<div class="card"><div class="e">🎬</div><b>Pop culture</b><p>"Will the new local film top the box office this weekend?"</p></div>
+<div class="card"><div class="e">👯</div><b>Friend groups</b><p>"Will Aigerim be late to the meetup again?"</p></div>
+</div>
+</section>
+
+<section class="slide">
+<div class="tag">Under the hood</div>
+<h2>A market that is <span class="g">always open</span></h2>
+<p class="sub">No order book and no waiting for a counterparty. Each market is a small pool that always quotes a price.</p>
+<div class="code">YES shares × NO shares = constant<br>YES price = NO ÷ (YES + NO)<br>Winning share = 1 token</div>
+<div class="grid">
+<div class="card"><div class="e">⛓️</div><b>Why Solana</b><p>Fast, low-fee transactions make small trades practical. Anchor programs hold markets, positions and vaults.</p></div>
+<div class="card"><div class="e">👻</div><b>Phantom wallet</b><p>You sign in your browser; keys never leave the wallet.</p></div>
+<div class="card"><div class="e">🌐</div><b>Blazor in the browser</b><p>The app runs as WebAssembly and reads data straight from the chain.</p></div>
+</div>
+</section>
+
+<section class="slide">
+<div class="tag">What we built</div>
+<h2>Six instructions, <span class="g">one full cycle</span></h2>
+<div class="grid">
+<div class="card"><b>create_market</b><p>Anyone opens a YES/NO market with initial liquidity.</p></div>
+<div class="card"><b>buy</b><p>Buy shares with slippage protection.</p></div>
+<div class="card"><b>sell</b><p>Sell shares for an exact amount of collateral.</p></div>
+<div class="card"><b>resolve_market</b><p>The resolver declares the winner after the end time.</p></div>
+<div class="card"><b>redeem</b><p>Winners swap shares for collateral 1:1.</p></div>
+<div class="card"><b>claim_pool</b><p>The creator collects leftover winning shares.</p></div>
+</div>
+<div style="margin-top:14px"><span class="pill">✅ Live on devnet</span><span class="pill">Create → trade → resolve → redeem</span></div>
+</section>
+
+<section class="slide">
+<div class="tag">What's next</div>
+<h2>The <span class="g">roadmap</span></h2>
+<div class="road">
+<div class="card done"><div class="e">✅</div><b>Done: test version</b><ul><li>Create, buy, sell</li><li>Resolve and redeem</li><li>Phantom connection</li></ul></div>
+<div class="card"><div class="e">🎟️</div><b>Next: public beta</b><ul><li>Trading fee</li><li>Price charts</li><li>Portfolio page</li></ul></div>
+<div class="card"><div class="e">🔮</div><b>Then: trusted results</b><ul><li>Oracle or multisig</li><li>Dispute process</li><li>Automated tests</li></ul></div>
+<div class="card"><div class="e">🛡️</div><b>Before real money</b><ul><li>Security audit</li><li>Legal review</li></ul></div>
+</div>
+<div><span class="warn">⚠️ Devnet only · experimental · not audited</span></div>
+</section>
+
+<section class="slide">
+<div class="tag">The future is open</div>
+<h1>Got a <span class="g">hunch</span>?</h1>
+<p class="sub">KLuck.bet turns it into a market.</p>
+<div class="grid" style="max-width:980px">
+<div class="card"><div class="e">👤</div><b>Nurgain Alimurat</b><p>Founder &amp; Lead Engineer<br>@Artoriassik</p></div>
+<div class="card"><div class="e">🛠️</div><b>Abdugapbarov Ayub</b><p>DevRel &amp; Repository Designer<br>@Ayub_A_A</p></div>
+<div class="card"><div class="e">🎨</div><b>Aituganova Albina</b><p>Product Designer / Marketing Lead<br>@byalbinka</p></div>
+<div class="card"><div class="e">🔬</div><b>Dildakhmet Nurasyl</b><p>Research &amp; Product Analyst<br>@shirukow</p></div>
+</div>
+<div style="margin-top:14px"><span class="pill">🔗 Live demo: [link]</span><span class="pill">GitHub: [link]</span><span class="pill">Video: [link]</span></div>
+</section>
+
+</div>
+<div class="bar"><button id="p" aria-label="Previous slide">←</button><div class="dots" id="d"></div><span class="cnt" id="c"></span><button id="n" aria-label="Next slide">→</button></div></div>
+<script>
+const s=[...document.querySelectorAll('.slide')],d=document.getElementById('d'),pg=document.getElementById('pg'),c=document.getElementById('c');
+const p=document.getElementById('p'),n=document.getElementById('n');let i=0;
+s.forEach((_,j)=>{const e=document.createElement('i');e.onclick=()=>go(j);d.appendChild(e)});
+function go(k){i=Math.max(0,Math.min(s.length-1,k));
+s.forEach((e,j)=>e.classList.toggle('on',j===i));
+[...d.children].forEach((e,j)=>e.classList.toggle('on',j===i));
+pg.style.width=((i+1)/s.length*100)+'%';c.textContent=(i+1)+' / '+s.length;
+p.disabled=i===0;n.disabled=i===s.length-1}
+p.onclick=()=>go(i-1);n.onclick=()=>go(i+1);
+document.addEventListener('keydown',e=>{
+if(e.key==='ArrowRight'||e.key==='PageDown'||(e.key===' '&&e.target.tagName!=='BUTTON'))go(i+1);
+else if(e.key==='ArrowLeft'||e.key==='PageUp')go(i-1);
+else if(e.key==='Home')go(0);else if(e.key==='End')go(s.length-1);
+else if(e.key==='f'||e.key==='F'){try{document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen()}catch(_){}}});
+let tx=null;
+document.addEventListener('touchstart',e=>{tx=e.target.closest('input')?null:e.touches[0].clientX},{passive:true});
+document.addEventListener('touchend',e=>{if(tx===null)return;const dx=e.changedTouches[0].clientX-tx;if(Math.abs(dx)>60)go(i+(dx<0?1:-1));tx=null},{passive:true});
+/* Live AMM demo: constant product, pool starts at 100 YES / 100 NO */
+const rg=document.getElementById('rg'),py=document.getElementById('py'),pn=document.getElementById('pn'),out=document.getElementById('out');
+const sy=document.getElementById('sy'),sn=document.getElementById('sn'),s1=document.getElementById('s1'),s2=document.getElementById('s2'),s3=document.getElementById('s3');
+let side='YES';
+function amm(){const a=+rg.value,y=100,nn=100,k=y*nn;let y2=y,n2=nn,sh=0;
+if(side==='YES'){n2=nn+a;y2=k/n2;sh=y+a-y2}else{y2=y+a;n2=k/y2;sh=nn+a-n2}
+const price=n2/(y2+n2)*100;
+py.style.width=price+'%';pn.style.width=(100-price)+'%';
+py.textContent='YES '+price.toFixed(0)+'%';pn.textContent='NO '+(100-price).toFixed(0)+'%';
+if(a===0){out.textContent='Nobody has bet yet, so it is a coin flip: 50%.';s1.textContent=s2.textContent=s3.textContent='–';return}
+out.textContent='You spend '+a+' tokens on '+side+'. The crowd now sees '+price.toFixed(0)+'% odds for YES.';
+s1.textContent=sh.toFixed(1);s2.textContent=sh.toFixed(1)+' tokens';
+const pr=sh-a;s3.textContent=(pr>=0?'+':'')+pr.toFixed(1)}
+function setSide(v){side=v;sy.classList.toggle('on',v==='YES');sn.classList.toggle('on',v==='NO');amm()}
+sy.onclick=()=>setSide('YES');sn.onclick=()=>setSide('NO');rg.oninput=amm;amm();go(0);
+</script>
+</body></html>

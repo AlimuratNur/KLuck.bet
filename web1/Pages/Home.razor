@@ -1,48 +1,143 @@
 ﻿@page "/"
+@implements IDisposable
 @using PolymarketApp.Services
-@using Solnet.Rpc
 @inject WalletService Wallet
-@inject IRpcClient Rpc
+@inject SolanaService Solana
 
-<h1>Prediction Markets (devnet)</h1>
+<section class="k-hero">
+    <h1>Bet on campus life.<br /><span class="k-grad">Settle it on-chain.</span></h1>
+    <p>Will the final exam be on December 10th? Challenge a friend, let others join either side or just watch, and the winners split the pool automatically.</p>
+    <div class="k-hero-actions">
+        <button class="k-btn k-btn-primary k-btn-lg" @onclick="() => showCreate = !showCreate">+ New bet</button>
+        <button class="k-btn k-btn-ghost k-btn-lg" @onclick="Load">Refresh</button>
+    </div>
+</section>
 
-@if (Wallet.Address is null)
+@if (showCreate)
 {
-    <button class="btn btn-primary" @onclick="Connect">Connect Phantom</button>
+    <div class="k-card k-form">
+        <h3>Create a bet</h3>
+        @if (Wallet.Address is null)
+        {
+            <p class="k-muted" style="margin-top:.8rem">Connect your wallet (top right) to create a bet.</p>
+        }
+        else
+        {
+            <label>What are you betting on?</label>
+            <input class="k-input" maxlength="140" placeholder="Calculus final will be on December 10" @bind="title" />
+
+            <div class="k-form-row">
+                <div>
+                    <label>Joining closes</label>
+                    <input class="k-input" type="datetime-local" @bind="closeAt" />
+                </div>
+                <div>
+                    <label>Your stake (tokens)</label>
+                    <input class="k-input" type="number" min="1" @bind="stake" />
+                </div>
+            </div>
+
+            <label>Your side</label>
+            <div class="k-seg">
+                <button class="yes @(side == 0 ? "active" : "")" @onclick="() => side = 0">YES</button>
+                <button class="no @(side == 1 ? "active" : "")" @onclick="() => side = 1">NO</button>
+            </div>
+
+            <label>Judge wallet (decides the result)</label>
+            <input class="k-input" placeholder="Empty = you judge. A neutral friend is fairer." @bind="judge" />
+
+            <button class="k-btn k-btn-primary k-btn-block" style="margin-top:1.2rem" disabled="@busy" @onclick="Create">
+                @(busy ? "Waiting for wallet..." : "Create bet")
+            </button>
+        }
+    </div>
+}
+
+@if (msg is not null) { <div class="k-alert">@((MarkupString)msg)</div> }
+
+<div class="k-tabs">
+    <button class="k-tab @(filter == "open" ? "active" : "")" @onclick='() => filter = "open"'>Open</button>
+    <button class="k-tab @(filter == "wait" ? "active" : "")" @onclick='() => filter = "wait"'>Waiting for result</button>
+    <button class="k-tab @(filter == "done" ? "active" : "")" @onclick='() => filter = "done"'>Finished</button>
+</div>
+
+@if (bets is null)
+{
+    <p class="k-empty">Loading bets...</p>
+}
+else if (!Filtered.Any())
+{
+    <p class="k-empty">Nothing here yet. Be the first to start a bet!</p>
 }
 else
 {
-    <p>Connected: <code>@Wallet.Address</code></p>
-    <p>Balance: @(balance?.ToString("F4") ?? "...") SOL</p>
-    <button class="btn btn-secondary" @onclick="Disconnect">Disconnect</button>
-}
-
-@if (error is not null)
-{
-    <p class="text-danger">@error</p>
+    <div class="k-grid">
+        @foreach (var b in Filtered)
+        {
+            <a class="k-card k-bet" href="/bet/@b.Address">
+                <div class="k-row">
+                    <span class="k-chip k-chip-@b.StatusClass">@b.StatusText</span>
+                    <span class="k-muted k-small" style="margin:0">@b.CloseLocal.ToString("d MMM, HH:mm")</span>
+                </div>
+                <h3>@b.Title</h3>
+                <div class="k-split"><span class="k-yes">YES @b.YesPctText%</span><span class="k-no">NO @b.NoPctText%</span></div>
+                <div class="k-bar"><div class="k-bar-yes" style="width:@(b.YesWidth)%"></div></div>
+                <div class="k-muted k-small">Pool: @SolanaService.Fmt(b.Total) tokens</div>
+            </a>
+        }
+    </div>
 }
 
 @code {
-    double? balance;
-    string? error;
+    List<BetInfo>? bets;
+    string filter = "open";
+    bool showCreate, busy;
+    string? msg;
 
-    protected override void OnInitialized() => Wallet.Changed += StateHasChanged;
+    string title = "";
+    DateTime closeAt = DateTime.Now.AddDays(1);
+    decimal stake = 10;
+    int side;
+    string judge = "";
+    Action? handler;
 
-    async Task Connect()
+    IEnumerable<BetInfo> Filtered => (bets ?? new()).Where(b => filter switch
+    {
+        "open" => b.CanJoin,
+        "wait" => b.WaitingForResult,
+        _ => b.Status != 0
+    });
+
+    protected override async Task OnInitializedAsync()
+    {
+        handler = () => InvokeAsync(StateHasChanged);
+        Wallet.Changed += handler;
+        await Load();
+    }
+
+    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+
+    async Task Load()
+    {
+        try { bets = await Solana.GetBetsAsync(); }
+        catch (Exception e) { msg = $"Could not load bets: {e.Message}"; bets = new(); }
+    }
+
+    async Task Create()
     {
         try
         {
-            error = null;
-            await Wallet.ConnectAsync();
-            var res = await Rpc.GetBalanceAsync(Wallet.Address!);
-            balance = res.WasSuccessful ? res.Result.Value / 1_000_000_000.0 : null;
+            busy = true; msg = null;
+            if (string.IsNullOrWhiteSpace(title)) throw new Exception("Write what the bet is about.");
+            var close = new DateTimeOffset(closeAt).ToUnixTimeSeconds();
+            var who = string.IsNullOrWhiteSpace(judge) ? Wallet.Address! : judge.Trim();
+            var sig = await Solana.CreateBetAsync(title.Trim(), close, who, side, SolanaService.ToBase(stake));
+            msg = $"Bet sent! <a target='_blank' href='https://explorer.solana.com/tx/{sig}?cluster=devnet'>View transaction</a>. It appears in the list in a few seconds.";
+            showCreate = false; title = "";
+            await Task.Delay(6000);
+            await Load();
         }
-        catch (Exception e) { error = e.Message; }
-    }
-
-    async Task Disconnect()
-    {
-        await Wallet.DisconnectAsync();
-        balance = null;
+        catch (Exception e) { msg = $"Error: {e.Message}"; }
+        finally { busy = false; }
     }
 }

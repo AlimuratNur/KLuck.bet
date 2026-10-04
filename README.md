@@ -278,7 +278,7 @@ Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 
 - [Project Presentation](#)
 - [Video Demo](#)
-- [Live Application](#)
+- [Live Application](https://kluck-bet.vercel.app/)
 - [Solana docs](https://solana.com/docs)
 - [Anchor](https://www.anchor-lang.com/)
 - [Solnet](https://github.com/bmresearch/Solnet)

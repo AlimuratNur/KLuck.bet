@@ -2,7 +2,7 @@
 @implements IDisposable
 @using PolymarketApp.Services
 @inject WalletService Wallet
-@inject ProfileService Profile
+@inject ApiService Api
 @inject SolanaService Solana
 @inject IJSRuntime JS
 
@@ -23,7 +23,7 @@
                 <span class="k-balance" title="Your test tokens">🪙 @SolanaService.Fmt(balance)</span>
 
                 <button class="k-me" @onclick="() => menuOpen = !menuOpen">
-                    <Avatar Address="@Wallet.Address" Emoji="@Profile.Emoji" Size="34" />
+                    <Avatar Address="@Wallet.Address" Emoji="@MyEmoji" Size="34" />
                     <span class="k-me-name">@DisplayName</span>
                 </button>
 
@@ -32,10 +32,10 @@
                     <div class="k-overlay" @onclick="() => menuOpen = false"></div>
                     <div class="k-menu">
                         <div class="k-menu-head">
-                            <Avatar Address="@Wallet.Address" Emoji="@Profile.Emoji" Size="48" />
+                            <Avatar Address="@Wallet.Address" Emoji="@MyEmoji" Size="48" />
                             <div>
                                 <strong>@DisplayName</strong>
-                                <div class="k-muted" style="font-size:.8rem">@Short(Wallet.Address)</div>
+                                <div class="k-muted" style="font-size:.8rem">@ApiService.Short(Wallet.Address)</div>
                             </div>
                         </div>
                         <button class="k-menu-item" @onclick="OpenEdit">✏️ Edit profile</button>
@@ -65,7 +65,7 @@
                     <button class="k-emoji @(editEmoji == e ? "active" : "")" @onclick="() => editEmoji = e">@e</button>
                 }
             </div>
-            <p class="k-hint">Your name and avatar are saved in this browser only, for now.</p>
+            <p class="k-hint">Everyone on KLuck.bet will see your name and avatar. You'll be asked to sign a message once.</p>
 
             <div class="k-modal-actions">
                 <button class="k-btn k-btn-ghost" @onclick="() => editing = false">Cancel</button>
@@ -75,12 +75,27 @@
     </div>
 }
 
-<main class="k-main">
-    @if (error is not null) { <div class="k-alert">@error</div> }
-    @Body
-</main>
+<div class="k-shell">
+    <aside class="k-side">
+        @if (Wallet.Address is not null)
+        {
+            <button class="k-side-me" @onclick="OpenEdit">
+                <Avatar Address="@Wallet.Address" Emoji="@MyEmoji" Size="44" />
+                <span>@DisplayName</span>
+            </button>
+        }
+        <NavLink class="k-side-item" href="" Match="NavLinkMatch.All"><span>🏠</span> Feed</NavLink>
+        <NavLink class="k-side-item" href="my"><span>🎯</span> My bets</NavLink>
+        <a class="k-side-item" href="/?new=1"><span>➕</span> New bet</a>
+        <button class="k-side-item" @onclick="OpenEdit"><span>👤</span> Profile</button>
+        <div class="k-side-note">Unofficial KBTU student project. Devnet demo, test tokens only.</div>
+    </aside>
 
-<footer class="k-footer">Unofficial student project · devnet demo · test tokens only</footer>
+    <main class="k-main">
+        @if (error is not null) { <div class="k-alert">@error</div> }
+        @Body
+    </main>
+</div>
 
 @code {
     static readonly string[] Emojis =
@@ -93,8 +108,16 @@
     Action? handler;
     CancellationTokenSource? cts;
 
-    static string Short(string a) => a[..4] + "…" + a[^4..];
-    string DisplayName => string.IsNullOrWhiteSpace(Profile.Name) ? Short(Wallet.Address!) : Profile.Name!;
+    string? MyEmoji => Wallet.Address is null ? null : Api.Get(Wallet.Address).Emoji;
+
+    string DisplayName
+    {
+        get
+        {
+            var n = Api.Get(Wallet.Address!).Name;
+            return string.IsNullOrWhiteSpace(n) ? ApiService.Short(Wallet.Address!) : n!;
+        }
+    }
 
     protected override void OnInitialized()
     {
@@ -113,7 +136,11 @@
     async Task OnWalletChanged()
     {
         if (Wallet.Address is null) { balance = 0; menuOpen = false; }
-        else { await Profile.LoadAsync(Wallet.Address); await RefreshBalance(); }
+        else
+        {
+            await Api.LoadProfilesAsync(new[] { Wallet.Address });
+            await RefreshBalance();
+        }
         StateHasChanged();
     }
 
@@ -154,14 +181,16 @@
     void OpenEdit()
     {
         menuOpen = false;
-        editName = Profile.Name ?? "";
-        editEmoji = Profile.Emoji ?? "";
+        if (Wallet.Address is null) { error = "Connect your wallet first."; return; }
+        editName = Api.Get(Wallet.Address).Name ?? "";
+        editEmoji = Api.Get(Wallet.Address).Emoji ?? "";
         editing = true;
     }
 
     async Task SaveProfile()
     {
-        await Profile.SaveAsync(Wallet.Address!, editName.Trim(), editEmoji);
+        try { error = null; await Api.SaveProfileAsync(editName.Trim(), editEmoji); }
+        catch (Exception e) { error = e.Message; }
         editing = false;
     }
-}
+}3

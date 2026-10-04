@@ -190,4 +190,19 @@ public class SolanaService(IRpcClient rpc, WalletService wallet, IJSRuntime js)
         if (!res.WasSuccessful || res.Result?.Value is null) return 0;
         return ulong.TryParse(res.Result.Value.Amount, out var v) ? v : 0;
     }
+    
+    public async Task<List<(string Bet, PositionInfo Pos)>> GetMyPositionsAsync(string owner)
+    {
+        // Position accounts are 90 bytes; the owner address starts at byte 40.
+        var res = await rpc.GetProgramAccountsAsync(Chain.ProgramId, dataSize: 90,
+            memCmpList: new List<MemCmp> { new MemCmp { Offset = 40, Bytes = owner } });
+        if (!res.WasSuccessful) throw new Exception(res.Reason);
+
+        return res.Result.Select(a =>
+        {
+            var d = Convert.FromBase64String(a.Account.Data[0]);
+            var bet = new PublicKey(d.AsSpan(8, 32).ToArray()).Key;
+            return (bet, new PositionInfo(BitConverter.ToUInt64(d, 72), BitConverter.ToUInt64(d, 80), d[88] == 1));
+        }).ToList();
+    }
 }

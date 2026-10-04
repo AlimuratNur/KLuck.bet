@@ -3,7 +3,7 @@
 @using PolymarketApp.Services
 @inject WalletService Wallet
 @inject SolanaService Solana
-@inject ProfileService Profile
+@inject ApiService Api
 @inject IJSRuntime JS
 @inject NavigationManager Nav
 
@@ -55,6 +55,7 @@
                             {
                                 <a class="k-act" href="/bet/@b.Address">View result</a>
                             }
+                            <a class="k-act" href="/bet/@b.Address#comments">💬 @CountFor(b.Address)</a>
                             <button class="k-act" @onclick="() => Share(b.Address)">🔗 Share</button>
                         </footer>
                     </article>
@@ -115,6 +116,17 @@ else
     
     CancellationTokenSource? cts;
 
+    Dictionary<string, int> counts = new();
+
+    [SupplyParameterFromQuery(Name = "new")] public string? NewBet { get; set; }
+
+    protected override void OnParametersSet()
+    {
+        if (NewBet == "1") showCreate = true;
+    }
+
+    int CountFor(string bet) => counts.TryGetValue(bet, out var n) ? n : 0;
+    
     IEnumerable<BetInfo> Filtered => (bets ?? new()).Where(b => filter switch
     {
         "open" => b.CanJoin,
@@ -152,9 +164,16 @@ else
         if (handler is not null) Wallet.Changed -= handler;
     }
 
+    
+
     async Task Load(bool silent = false)
     {
-        try { bets = await Solana.GetBetsAsync(); }
+        try
+        {
+            bets = await Solana.GetBetsAsync();
+            counts = await Api.GetCountsAsync();
+            await Api.LoadProfilesAsync(bets.Select(b => b.Creator));
+        }
         catch (Exception e)
         {
             if (!silent) msg = $"Could not load bets: {e.Message}";
@@ -209,12 +228,10 @@ else
         closeTime = t.ToString("HH:mm");
     }
     
-    string NameFor(string creator) =>
-        creator == Wallet.Address
-            ? (string.IsNullOrWhiteSpace(Profile.Name) ? "You" : Profile.Name!)
-            : creator[..4] + "…" + creator[^4..];
+    string NameFor(string address) => Api.NameOf(address);
+    string? EmojiFor(string address) => Api.Get(address).Emoji;
 
-    string? EmojiFor(string creator) => creator == Wallet.Address ? Profile.Emoji : null;
+    
 
     async Task Share(string address)
     {

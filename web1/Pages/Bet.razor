@@ -3,6 +3,7 @@
 @using PolymarketApp.Services
 @inject WalletService Wallet
 @inject SolanaService Solana
+@inject ApiService Api
 
 <a class="k-back" href="/">&larr; All bets</a>
 
@@ -105,8 +106,58 @@ else
                 }
             </div>
         }
+        
+        <div class="k-card" id="comments">
+            <h3>💬 Comments @(comments is null ? "" : $"({comments.Count})")</h3>
+
+            @if (comments is null)
+            {
+                <p class="k-muted k-small">Comments are offline (the backend is not running).</p>
+            }
+            else
+            {
+                @if (Wallet.Address is not null)
+                {
+                    <div class="k-compose">
+                        <Avatar Address="@Wallet.Address" Emoji="@Api.Get(Wallet.Address).Emoji" Size="38" />
+                        <input class="k-input" maxlength="500" placeholder="Write a comment..."
+                               @bind="commentText" @bind:event="oninput" @onkeydown="OnKey" />
+                        <button class="k-btn k-btn-primary" disabled="@(commenting || string.IsNullOrWhiteSpace(commentText))" @onclick="PostComment">Post</button>
+                    </div>
+                }
+                else
+                {
+                    <p class="k-muted k-small">Connect your wallet to comment.</p>
+                }
+
+                @foreach (var c in comments.OrderByDescending(c => c.CreatedAt))
+                {
+                    <div class="k-comment">
+                        <Avatar Address="@c.Author" Emoji="@Api.Get(c.Author).Emoji" Size="38" />
+                        <div class="k-bubble">
+                            <div class="k-bubble-top">
+                                <strong>@Api.NameOf(c.Author)</strong>
+                                <span class="k-muted">@Ago(c.CreatedAt)</span>
+                            </div>
+                            <div class="k-bubble-text">@c.Text</div>
+                            @if (c.Author == Wallet.Address)
+                            {
+                                <button class="k-link" @onclick="() => DeleteComment(c.Id)">Delete</button>
+                            }
+                        </div>
+                    </div>
+                }
+
+                @if (comments.Count == 0)
+                {
+                    <p class="k-muted k-small">No comments yet. Start the discussion!</p>
+                }
+            }
+        </div>
     }
 
+    
+    
     @if (msg is not null) { <div class="k-alert">@((MarkupString)msg)</div> }
 }
 
@@ -195,5 +246,52 @@ else
         }
         catch (Exception e) { msg = $"Error: {e.Message}"; }
         finally { busy = false; }
+    }
+    
+    List<CommentDto>? comments;
+    string commentText = "";
+    bool commenting;
+
+    static string Ago(long ms)
+    {
+        var d = DateTime.Now - DateTimeOffset.FromUnixTimeMilliseconds(ms).LocalDateTime;
+        if (d.TotalMinutes < 1) return "just now";
+        if (d.TotalHours < 1) return $"{(int)d.TotalMinutes} min";
+        if (d.TotalDays < 1) return $"{(int)d.TotalHours} h";
+        return $"{(int)d.TotalDays} d";
+    }
+
+    async Task LoadComments()
+    {
+        comments = await Api.GetCommentsAsync(Address);
+        if (comments is null) return;
+        var who = comments.Select(c => c.Author)
+            .Concat(Wallet.Address is null ? Array.Empty<string>() : new[] { Wallet.Address });
+        await Api.LoadProfilesAsync(who);
+    }
+
+    async Task PostComment()
+    {
+        try
+        {
+            commenting = true; msg = null;
+            await Api.PostCommentAsync(Address, commentText.Trim());
+            commentText = "";
+            await LoadComments();
+        }
+        catch (Exception e) { msg = e.Message; }
+        finally { commenting = false; }
+    }
+
+    async Task DeleteComment(int id)
+    {
+        try { await Api.DeleteCommentAsync(id); await LoadComments(); }
+        catch (Exception e) { msg = e.Message; }
+    }
+
+    async Task OnKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !commenting && !string.IsNullOrWhiteSpace(commentText))
+            await PostComment();
     }
 }

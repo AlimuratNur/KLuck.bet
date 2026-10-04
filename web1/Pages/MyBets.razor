@@ -1,0 +1,70 @@
+@page "/my"
+@implements IDisposable
+@using PolymarketApp.Services
+@inject WalletService Wallet
+@inject SolanaService Solana
+
+<h2 class="k-page-title">My bets</h2>
+
+@if (Wallet.Address is null)
+{
+    <p class="k-empty">Connect your wallet to see your bets.</p>
+}
+else if (rows is null)
+{
+    <p class="k-empty">Loading...</p>
+}
+else if (rows.Count == 0)
+{
+    <p class="k-empty">You haven't joined any bet yet. <a href="/">Browse the feed</a></p>
+}
+else
+{
+    <div class="k-feed">
+        @foreach (var r in rows)
+        {
+            var claim = r.Bet.ClaimAmount(r.Pos.Yes, r.Pos.No);
+            <a class="k-card k-mybet" href="/bet/@r.Bet.Address">
+                <div class="k-row">
+                    <span class="k-chip k-chip-@r.Bet.StatusClass">@r.Bet.StatusText</span>
+                    <span class="k-muted k-small" style="margin:0">Closes @r.Bet.CloseLocal.ToString("d MMM, HH:mm")</span>
+                </div>
+                <h3>@r.Bet.Title</h3>
+                <div class="k-split">
+                    <span>Your stake: <span class="k-yes">YES @SolanaService.Fmt(r.Pos.Yes)</span> · <span class="k-no">NO @SolanaService.Fmt(r.Pos.No)</span></span>
+                    @if (r.Bet.Status != 0 && !r.Pos.Claimed && claim > 0)
+                    {
+                        <span class="k-yes">Claim @SolanaService.Fmt(claim) 🪙</span>
+                    }
+                </div>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    List<(BetInfo Bet, PositionInfo Pos)>? rows;
+    Action? handler;
+
+    protected override async Task OnInitializedAsync()
+    {
+        handler = () => InvokeAsync(async () => { await Load(); StateHasChanged(); });
+        Wallet.Changed += handler;
+        await Load();
+    }
+
+    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+
+    async Task Load()
+    {
+        if (Wallet.Address is null) { rows = null; return; }
+        try
+        {
+            var mine = await Solana.GetMyPositionsAsync(Wallet.Address);
+            var all = await Solana.GetBetsAsync();
+            rows = mine.Join(all, m => m.Bet, b => b.Address, (m, b) => (b, m.Pos))
+                       .OrderByDescending(r => r.b.CloseTime).ToList();
+        }
+        catch { rows = new(); }
+    }
+}

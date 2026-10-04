@@ -30,5 +30,12 @@ window.wallet = {
         const tx = solanaWeb3.Transaction.from(bytes);
         const { signature } = await p.signAndSendTransaction(tx);
         return signature;
-    }
+    },
+    signMessage: async (text) => {
+        const p = window.phantom.solana;
+        const { signature } = await p.signMessage(new TextEncoder().encode(text), "utf8");
+        let s = "";
+        signature.forEach(b => s += String.fromCharCode(b));
+        return btoa(s);
+    },
 };

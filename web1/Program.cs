@@ -11,7 +11,8 @@ builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 
 builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.HostEnvironment.BaseAddress) });
-builder.Services.AddSingleton(ClientFactory.GetClient(Cluster.DevNet));
+var rpcUrl = builder.Configuration["RpcUrl"] ?? (Chain.ApiUrl + "/rpc");
+builder.Services.AddSingleton(ClientFactory.GetClient(rpcUrl));
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<SolanaService>();
 builder.Services.AddScoped<ApiService>();

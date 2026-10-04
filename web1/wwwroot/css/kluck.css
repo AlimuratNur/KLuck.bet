@@ -207,3 +207,5 @@ a.k-card:hover { border-color: var(--brand); transform: translateY(-2px); transi
 
 .k-page-title { font-size: 1.6rem; font-weight: 800; margin-bottom: 1rem; }
 .k-mybet h3 { margin: .7rem 0; font-size: 1.05rem; }
+
+.k-btn-sm { padding: .4rem .8rem; font-size: .85rem; }

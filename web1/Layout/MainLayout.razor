@@ -11,6 +11,7 @@
         <a class="k-brand" href="/">
             <span class="k-logo">K</span>KLuck<span class="k-dot">.bet</span>
             <span class="k-badge">KBTU</span>
+            
         </a>
 
         <div class="k-nav-right">
@@ -21,7 +22,12 @@
             else
             {
                 <span class="k-balance" title="Your test tokens">🪙 @SolanaService.Fmt(balance)</span>
-
+                @if (balance < 1_000_000)
+                {
+                    <button class="k-btn k-btn-primary k-btn-sm" disabled="@claiming" @onclick="ClaimTokens">
+                        @(claiming ? "Sending..." : "Get test tokens")
+                    </button>
+                }
                 <button class="k-me" @onclick="() => menuOpen = !menuOpen">
                     <Avatar Address="@Wallet.Address" Emoji="@MyEmoji" Size="34" />
                     <span class="k-me-name">@DisplayName</span>
@@ -38,6 +44,7 @@
                                 <div class="k-muted" style="font-size:.8rem">@ApiService.Short(Wallet.Address)</div>
                             </div>
                         </div>
+                        <button class="k-menu-item" @onclick="ClaimTokens">🪙 Get test tokens</button>
                         <button class="k-menu-item" @onclick="OpenEdit">✏️ Edit profile</button>
                         <button class="k-menu-item" @onclick="CopyAddress">📋 Copy wallet address</button>
                         <button class="k-menu-item" @onclick="Disconnect">🚪 Disconnect</button>
@@ -74,6 +81,7 @@
         </div>
     </div>
 }
+@if (info is not null) { <div class="k-alert">@info</div> }
 
 <div class="k-shell">
     <aside class="k-side">
@@ -193,4 +201,21 @@
         catch (Exception e) { error = e.Message; }
         editing = false;
     }
-}3
+    
+    string? info;
+    bool claiming;
+
+    async Task ClaimTokens()
+    {
+        try
+        {
+            menuOpen = false; claiming = true; error = null; info = null;
+            var r = await Api.ClaimFaucetAsync();
+            info = $"You received {r.Tokens} test tokens" + (r.Sol ? " and a little SOL for fees." : ".");
+            await Task.Delay(4000);
+            await RefreshBalance();
+        }
+        catch (Exception e) { error = e.Message; }
+        finally { claiming = false; }
+    }
+}

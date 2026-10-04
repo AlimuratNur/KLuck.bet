@@ -12,6 +12,7 @@ record CountDto(string Bet, int Count);
 
 public class ApiService(IJSRuntime js, WalletService wallet)
 {
+    public record FaucetResult(string Signature, int Tokens, bool Sol);
     static readonly HttpClient http = new() { BaseAddress = new Uri(Chain.ApiUrl) };
     readonly Dictionary<string, ProfileDto> profiles = new();
     string? token, tokenOwner;
@@ -125,5 +126,12 @@ public class ApiService(IJSRuntime js, WalletService wallet)
             token = null; tokenOwner = null;
         }
         throw new Exception("Could not sign in.");
+    }
+    public async Task<FaucetResult> ClaimFaucetAsync()
+    {
+        var res = await SendAuth(HttpMethod.Post, "api/faucet");
+        if (!res.IsSuccessStatusCode)
+            throw new Exception((await res.Content.ReadAsStringAsync()).Trim('"'));
+        return (await res.Content.ReadFromJsonAsync<FaucetResult>())!;
     }
 }

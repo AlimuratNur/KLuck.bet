@@ -1,0 +1,171 @@
+@page "/bet/{Address}"
+@implements IDisposable
+@using PolymarketApp.Services
+@inject WalletService Wallet
+@inject SolanaService Solana
+
+<a class="k-back" href="/">&larr; All bets</a>
+
+@if (bet is null)
+{
+    <p class="k-empty">@(loadError ?? "Loading...")</p>
+}
+else
+{
+    <div class="k-card">
+        <div class="k-row">
+            <span class="k-chip k-chip-@bet.StatusClass">@bet.StatusText</span>
+            <span class="k-muted">Closes @bet.CloseLocal.ToString("d MMM yyyy, HH:mm")</span>
+        </div>
+        <h2 class="k-title">@bet.Title</h2>
+        <div class="k-split k-big"><span class="k-yes">YES @bet.YesPctText%</span><span class="k-no">NO @bet.NoPctText%</span></div>
+        <div class="k-bar k-bar-lg"><div class="k-bar-yes" style="width:@(bet.YesWidth)%"></div></div>
+        <div class="k-split k-muted" style="margin-top:.6rem"><span>@SolanaService.Fmt(bet.YesPool) staked</span><span>@SolanaService.Fmt(bet.NoPool) staked</span></div>
+        <p class="k-muted k-small">Total pool: @SolanaService.Fmt(bet.Total) tokens &middot; Judge: <code>@Short(bet.Resolver)</code></p>
+    </div>
+
+    @if (Wallet.Address is null)
+    {
+        <div class="k-card"><p class="k-muted">You are watching. Connect your wallet (top right) to join this bet.</p></div>
+    }
+    else
+    {
+        <div class="k-card">
+            <h3>Your position</h3>
+            <p class="k-muted k-small">YES: <strong class="k-yes">@SolanaService.Fmt(pos.Yes)</strong> &nbsp; NO: <strong class="k-no">@SolanaService.Fmt(pos.No)</strong></p>
+        </div>
+
+        @if (bet.CanJoin)
+        {
+            <div class="k-card">
+                <h3>Join this bet</h3>
+                <div class="k-label">Pick a side</div>
+                <div class="k-seg">
+                    <button class="yes @(side == 0 ? "active" : "")" @onclick="() => side = 0">YES</button>
+                    <button class="no @(side == 1 ? "active" : "")" @onclick="() => side = 1">NO</button>
+                </div>
+
+                <div class="k-label">Amount (tokens)</div>
+                <input class="k-input" type="number" min="1" @bind="amount" @bind:event="oninput" />
+                <div class="k-quick">
+                    @foreach (var v in new[] { 5, 10, 25, 100 })
+                    {
+                        <button class="k-chip" @onclick="() => amount = v">@v</button>
+                    }
+                </div>
+
+                <p class="k-hint">
+                    If <strong>@(side == 0 ? "YES" : "NO")</strong> wins you would get about
+                    <strong>@SolanaService.Fmt(bet.PotentialPayout(side, side == 0 ? pos.Yes : pos.No, SolanaService.ToBase(amount)))</strong> tokens.
+                    @if ((side == 0 ? bet.NoPool : bet.YesPool) == 0)
+                    {
+                        <br /><span>Nobody is on the other side yet, so share the link with a friend!</span>
+                    }
+                </p>
+
+                <button class="k-btn @(side == 0 ? "k-btn-yes" : "k-btn-no") k-btn-block" style="margin-top:1rem" disabled="@busy" @onclick="Join">
+                    @(busy ? "Waiting for wallet..." : $"Bet {amount} on {(side == 0 ? "YES" : "NO")}")
+                </button>
+            </div>
+        }
+
+        @if (bet.WaitingForResult && Wallet.Address == bet.Resolver)
+        {
+            <div class="k-card">
+                <h3>You are the judge. What happened?</h3>
+                <div class="k-seg" style="margin-top:1rem">
+                    <button class="k-btn k-btn-yes" disabled="@busy" @onclick="() => Resolve(0)">YES happened</button>
+                    <button class="k-btn k-btn-no" disabled="@busy" @onclick="() => Resolve(1)">NO happened</button>
+                </div>
+            </div>
+        }
+
+        @if (bet.Status == 0 && Wallet.Address == bet.Resolver)
+        {
+            <button class="k-btn k-btn-ghost" disabled="@busy" @onclick="Cancel">Cancel bet and refund everyone</button>
+        }
+
+        @if (bet.Status != 0)
+        {
+            <div class="k-card">
+                @if (pos.Claimed)
+                {
+                    <h3>Claimed &#10003;</h3>
+                }
+                else if (bet.ClaimAmount(pos.Yes, pos.No) > 0)
+                {
+                    <h3>@(bet.Status == 2 ? "Refund available" : "You won!")</h3>
+                    <button class="k-btn k-btn-primary k-btn-block" style="margin-top:1rem" disabled="@busy" @onclick="Claim">
+                        Claim @SolanaService.Fmt(bet.ClaimAmount(pos.Yes, pos.No)) tokens
+                    </button>
+                }
+                else
+                {
+                    <p class="k-muted">Nothing to claim from this bet.</p>
+                }
+            </div>
+        }
+    }
+
+    @if (msg is not null) { <div class="k-alert">@((MarkupString)msg)</div> }
+}
+
+@code {
+    [Parameter] public string Address { get; set; } = "";
+
+    BetInfo? bet;
+    PositionInfo pos = new(0, 0, false);
+    int side;
+    decimal amount = 10;
+    bool busy;
+    string? msg, loadError;
+    Action? handler;
+
+    static string Short(string a) => a[..4] + "…" + a[^4..];
+
+    protected override void OnInitialized()
+    {
+        handler = () => InvokeAsync(async () => { await LoadPosition(); StateHasChanged(); });
+        Wallet.Changed += handler;
+    }
+
+    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+
+    protected override async Task OnParametersSetAsync() => await Reload();
+
+    async Task Reload()
+    {
+        try
+        {
+            bet = await Solana.GetBetAsync(Address);
+            loadError = bet is null ? "Bet not found." : null;
+            await LoadPosition();
+        }
+        catch (Exception e) { loadError = e.Message; }
+    }
+
+    async Task LoadPosition()
+    {
+        if (bet is not null && Wallet.Address is not null)
+            pos = await Solana.GetPositionAsync(Address, Wallet.Address);
+    }
+
+    Task Join() => Run(() => Solana.JoinAsync(bet!, side, SolanaService.ToBase(amount)));
+    Task Resolve(int winner) => Run(() => Solana.ResolveAsync(bet!, winner));
+    Task Cancel() => Run(() => Solana.CancelAsync(bet!));
+    Task Claim() => Run(() => Solana.ClaimAsync(bet!));
+
+    async Task Run(Func<Task<string>> action)
+    {
+        try
+        {
+            busy = true; msg = null;
+            var sig = await action();
+            msg = $"Sent! <a target='_blank' href='https://explorer.solana.com/tx/{sig}?cluster=devnet'>View transaction</a>";
+            await Task.Delay(5000);
+            await Reload();
+        }
+        catch (Exception e) { msg = $"Error: {e.Message}"; }
+        finally { busy = false; }
+    }
+}

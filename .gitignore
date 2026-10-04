@@ -5,8 +5,8 @@ contracts/node_modules/
 **/test-ledger/
 
 # .NET
-web/bin/
-web/obj/
+web1/bin/
+web1/obj/
 .vs/
 .idea/
 

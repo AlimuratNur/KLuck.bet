@@ -26,16 +26,27 @@
             <label>What are you betting on?</label>
             <input class="k-input" maxlength="140" placeholder="Calculus final will be on December 10" @bind="title" />
 
-            <div class="k-form-row">
-                <div>
-                    <label>Joining closes</label>
-                    <input class="k-input" type="datetime-local" @bind="closeAt" />
+            <label>Joining closes</label>
+                <div class="k-quick" style="margin:0 0 .7rem">
+                <button class="k-chip" @onclick="() => SetClose(DateTime.Now.AddHours(1))">In 1 hour</button>
+                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(1).AddHours(12))">Tomorrow</button>
+                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(3).AddHours(12))">In 3 days</button>
+                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(7).AddHours(12))">In 1 week</button>
+                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddMonths(1).AddHours(12))">In 1 month</button>
                 </div>
-                <div>
-                    <label>Your stake (tokens)</label>
-                    <input class="k-input" type="number" min="1" @bind="stake" />
+                <div class="k-form-row">
+                <input class="k-input" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="closeDate" />
+                <select class="k-input" @bind="closeTime">
+                                              @foreach (var t in Times)
+            {
+                <option value="@t">@t</option>
+            }
+            </select>
                 </div>
-            </div>
+                <div class="k-when">Closes <strong>@CloseAt.ToString("ddd, d MMM yyyy 'at' HH:mm")</strong> (@Relative)</div>
+
+                <label>Your stake (tokens)</label>
+                <input class="k-input" type="number" min="1" @bind="stake" />
 
             <label>Your side</label>
             <div class="k-seg">
@@ -95,7 +106,8 @@ else
     string? msg;
 
     string title = "";
-    DateTime closeAt = DateTime.Now.AddDays(1);
+    DateTime closeDate = DateTime.Today.AddDays(1);
+    
     decimal stake = 10;
     int side;
     string judge = "";
@@ -156,7 +168,8 @@ else
         {
             busy = true; msg = null;
             if (string.IsNullOrWhiteSpace(title)) throw new Exception("Write what the bet is about.");
-            var close = new DateTimeOffset(closeAt).ToUnixTimeSeconds();
+            if (CloseAt <= DateTime.Now) throw new Exception("Pick a closing time in the future.");
+            var close = new DateTimeOffset(CloseAt).ToUnixTimeSeconds();
             var who = string.IsNullOrWhiteSpace(judge) ? Wallet.Address! : judge.Trim();
             var sig = await Solana.CreateBetAsync(title.Trim(), close, who, side, SolanaService.ToBase(stake));
             msg = $"Bet sent! <a target='_blank' href='https://explorer.solana.com/tx/{sig}?cluster=devnet'>View transaction</a>. It appears in the list in a few seconds.";
@@ -166,5 +179,33 @@ else
         }
         catch (Exception e) { msg = $"Error: {e.Message}"; }
         finally { busy = false; }
+    }
+    
+    
+    string closeTime = "12:00";
+
+    static readonly string[] Times =
+        Enumerable.Range(0, 48).Select(i => $"{i / 2:00}:{i % 2 * 30:00}").ToArray();
+
+    DateTime CloseAt => closeDate.Date + TimeSpan.Parse(closeTime);
+
+    string Relative
+    {
+        get
+        {
+            var d = CloseAt - DateTime.Now;
+            if (d.TotalMinutes <= 0) return "in the past!";
+            if (d.TotalHours < 24) return $"in {(int)d.TotalHours}h {d.Minutes}m";
+            return $"in {(int)d.TotalDays} days";
+        }
+    }
+
+// Rounds up to the next 30 minutes so it matches the time dropdown.
+    void SetClose(DateTime t)
+    {
+        var step = TimeSpan.FromMinutes(30).Ticks;
+        t = new DateTime((t.Ticks + step - 1) / step * step);
+        closeDate = t.Date;
+        closeTime = t.ToString("HH:mm");
     }
 }

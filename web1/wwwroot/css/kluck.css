@@ -108,3 +108,8 @@ a.k-card:hover { border-color: var(--brand); transform: translateY(-2px); transi
 .k-empty { text-align: center; color: var(--muted); padding: 2rem 0; }
 
 @media (max-width: 560px) { .k-form-row { grid-template-columns: 1fr; } }
+
+.k-quick { flex-wrap: wrap; }
+.k-chip:hover { border-color: var(--brand); }
+.k-when { margin-top: .7rem; padding: .6rem .9rem; border-radius: 12px; font-size: .9rem;
+  background: rgba(79,140,255,.1); border: 1px solid rgba(79,140,255,.3); }

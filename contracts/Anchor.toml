@@ -10,7 +10,7 @@ skip-lint = false
 hello_test = "B3WpaPrLXRRnctaivRgwUBXdmGfcayZfKu4HqPHmH73i"
 
 [provider]
-cluster = "localnet"
+cluster = "devnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

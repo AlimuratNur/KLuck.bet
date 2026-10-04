@@ -1,25 +1,83 @@
-# KLuck.bet
+# KLuck.bet — Prediction Market on Solana
 
-A prediction market on **Solana**, inspired by Polymarket. Users create YES/NO markets, buy and sell outcome shares, and after a market ends the winners redeem their payout.
+[![License: MIT](https://img.shields.io/badge/License-MIT-14F195.svg)](LICENSE)
+[![Solana](https://img.shields.io/badge/Solana-devnet-9945FF)](https://solana.com)
+[![Anchor](https://img.shields.io/badge/Anchor-1.2.0-14F195)](https://www.anchor-lang.com/)
+[![Status](https://img.shields.io/badge/status-experimental-orange)](#known-limitations)
 
-- **Smart contract:** Rust + Anchor 1.2.0
-- **Frontend:** C# Blazor WebAssembly + Solnet
-- **Wallet:** Phantom (transactions are signed in the browser, private keys never leave the wallet)
-- **Network:** **devnet** only (test network)
+> A Polymarket-inspired prediction market on Solana — create YES/NO markets, trade outcome shares through a constant-product AMM, and redeem winnings 1:1 after resolution. Transactions are signed in the browser; private keys never leave your wallet.
 
-> ⚠️ This project is experimental. It has not been audited and must not be used with real money.
+[Live Demo](#) · [Video Walkthrough](#) · [Docs](docs/) · [Submission](#)
 
-## How it works
+> ⚠️ **Experimental.** This project has not been audited and must not be used with real money. Devnet only.
 
-Each market uses a constant-product AMM (the same model as Gnosis/Omen):
+---
+
+![KLuck.bet Dashboard](assets/project.jpg)
+
+---
+
+## Submission
+
+| Name | Role | Contact |
+|------|------|---------|
+| _Nurgain Alimurat_ | _Founder & Lead Engineer_ | [@Artoriassik](#) |
+| _Abdugapbarov Ayub_ | _DevRel & Repository Designer_ | [@Ayub_A_A](#) |
+| _Aituganova Albina_ |_Product Designer / Marketing Lead_ | [@byalbinka](#) |
+| _Dildakhmet Nurasyl_ | _Research & Product Analyst_ | [@shirukow](#) |
+
+---
+
+## Problem and Solution
+
+### 1. Opaque Pricing
+- **Problem:** Prediction markets need a price that reflects the crowd's belief, but order-book markets need many active traders to stay liquid.
+- **KLuck.bet:** A constant-product AMM (`y * n = k`, the Gnosis/Omen model) gives an always-available price. YES price = `n / (y + n)`, starting at 0.50.
+
+### 2. Trust in Custody
+- **Problem:** Centralized platforms hold user funds and keys.
+- **KLuck.bet:** Collateral sits in an on-chain vault per market. Trades are signed in Phantom, so private keys never leave the wallet.
+
+### 3. Unfair Rounding and Overflow Risk
+- **Problem:** Naive share math can leak value from the pool or overflow.
+- **KLuck.bet:** All math uses `u128`, and rounding always favors the pool.
+
+### 4. Simple, Predictable Payouts
+- **Problem:** Users want to know exactly what a winning share is worth.
+- **KLuck.bet:** After resolution, each winning share redeems for exactly 1 collateral token; losing shares are worth 0.
+
+---
+
+## Why Solana
+
+- **Speed** — Fast blocks make trading and redeeming feel instant in the browser
+- **Cost** — Low transaction fees make small trades and market creation practical
+- **Composability** — SPL tokens as collateral and Anchor-based programs fit the ecosystem
+- **Tooling** — Phantom wallet support and Solnet make a C# / Blazor WebAssembly frontend possible
+
+---
+
+## Summary of Features
+
+- Create YES/NO markets with initial liquidity
+- Buy outcome shares with slippage protection
+- Sell shares for an exact amount of collateral
+- Resolver declares the winning outcome after the end time
+- Winners redeem shares for collateral 1:1
+- Creator can collect the leftover winning shares from the pool (`claim_pool`)
+- Client-side quote math that matches the contract formula
+- Phantom wallet connection with in-browser signing
+
+---
+
+## How It Works
 
 - The pool holds reserves of YES and NO shares (`y` and `n`), and trading keeps `y * n = k` constant.
-- YES price = `n / (y + n)`. A new market starts at a price of 0.50.
 - Collateral is an SPL token (on devnet, a test token acting as "test USDC").
 - After resolution, each winning share redeems for 1 collateral token; losing shares are worth 0.
 - Rounding always favors the pool, and all math uses `u128`.
 
-### Contract instructions
+### Contract Instructions
 
 | Instruction | Caller | Description |
 |---|---|---|
@@ -32,11 +90,42 @@ Each market uses a constant-product AMM (the same model as Gnosis/Omen):
 
 ### Accounts
 
-- **Market:** question, end time, YES/NO reserves, status, winner, vault address.
-- **Position:** a user's YES/NO shares in one market (PDA derived from `market + user`).
-- **Vault:** the market's token account holding the collateral.
+| Account | Contents |
+|---|---|
+| **Market** | Question, end time, YES/NO reserves, status, winner, vault address |
+| **Position** | A user's YES/NO shares in one market (PDA derived from `market + user`) |
+| **Vault** | The market's token account holding the collateral |
 
-## Project structure
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| On-chain program | Rust · Anchor 1.2.0 |
+| Frontend | C# · Blazor WebAssembly |
+| Solana client | Solnet |
+| Wallet | Phantom (JS interop) |
+| Collateral | SPL token (test USDC on devnet) |
+| Network | Solana devnet |
+
+---
+
+## Architecture
+
+```
+┌─────────────────────┐     ┌──────────────────────┐     ┌──────────────────────┐
+│  Blazor WASM App    │────▶│   Phantom Wallet     │────▶│   Solana Devnet      │
+│  ┌───────────────┐  │     │  (signs in browser)  │     │  ┌────────────────┐  │
+│  │ Amm.cs quotes │  │     └──────────────────────┘     │  │ Anchor Program │  │
+│  ├───────────────┤  │                                  │  ├────────────────┤  │
+│  │ SolanaService │  │◀─────── reads via RPC ───────────│  │ Market / Pos.  │  │
+│  └───────────────┘  │                                  │  │ Vault (SPL)    │  │
+└─────────────────────┘                                  │  └────────────────┘  │
+                                                         └──────────────────────┘
+```
+
+### Project Structure
 
 ```
 polymarket_solana/          # smart contract (Anchor)
@@ -59,18 +148,20 @@ PolymarketApp/              # Blazor WebAssembly app
     └── Market.razor        # buy, sell, resolve, redeem
 ```
 
-The internal folder, module and namespace names are legacy and can be renamed to `kluckbet`. If you rename the program, run `anchor keys sync` and update `Chain.cs`.
+> The internal folder, module and namespace names are legacy and can be renamed to `kluckbet`. If you rename the program, run `anchor keys sync` and update `Chain.cs`.
 
-## Requirements
+---
+
+## Quick Start
+
+**Prerequisites:**
 
 - Linux / macOS / Windows (WSL)
 - [Rust](https://rustup.rs/)
-- [Solana CLI (Agave) and Anchor](https://solana.com/docs/intro/installation) (built with Anchor 1.2.0, Solana CLI 3.1.x, platform-tools v1.52)
+- [Solana CLI (Agave) and Anchor](https://solana.com/docs/intro/installation) — built with Anchor 1.2.0, Solana CLI 3.1.x, platform-tools v1.52
 - Node.js and Yarn
 - [.NET SDK](https://dotnet.microsoft.com/download) 8 or newer
-- The [Phantom](https://phantom.app/) browser extension with Testnet Mode (Devnet) enabled
-
-Verify your installation:
+- [Phantom](https://phantom.app/) browser extension with Testnet Mode (Devnet) enabled
 
 ```bash
 solana --version
@@ -79,9 +170,7 @@ cargo build-sbf --version
 dotnet --version
 ```
 
-## Getting started
-
-### 1. Smart contract
+### 1. Smart Contract
 
 ```bash
 cd polymarket_solana
@@ -96,11 +185,9 @@ anchor build
 anchor deploy --provider.cluster devnet
 ```
 
-Save the **Program ID** printed by `anchor deploy`. Deploying needs roughly 3 to 5 devnet SOL.
+Save the **Program ID** printed by `anchor deploy`. Deploying needs roughly 3 to 5 devnet SOL. If `Anchor.toml` has no `[programs.devnet]` section, copy the line from `[programs.localnet]` into it.
 
-If `Anchor.toml` has no `[programs.devnet]` section, copy the line from `[programs.localnet]` into it.
-
-> If LiteSVM tests fail with `InvalidAccountData`, build the program with the older SBPF target:
+> If LiteSVM tests fail with `InvalidAccountData`, build with the older SBPF target:
 > ```bash
 > cd programs/polymarket_solana
 > cargo build-sbf --arch v0
@@ -108,7 +195,7 @@ If `Anchor.toml` has no `[programs.devnet]` section, copy the line from `[progra
 > cargo test
 > ```
 
-### 2. Test collateral token
+### 2. Test Collateral Token
 
 ```bash
 cargo install spl-token-cli
@@ -117,13 +204,11 @@ spl-token create-account <MINT_ADDRESS>
 spl-token mint <MINT_ADDRESS> 10000
 ```
 
-Save the **mint address**. To trade from Phantom, send some tokens to your wallet:
+Save the **mint address**. To trade from Phantom, send some tokens to your wallet (which also needs devnet SOL from [faucet.solana.com](https://faucet.solana.com)):
 
 ```bash
 spl-token transfer <MINT_ADDRESS> 1000 <PHANTOM_ADDRESS> --fund-recipient
 ```
-
-The Phantom wallet also needs devnet SOL (from [faucet.solana.com](https://faucet.solana.com)).
 
 ### 3. Frontend (Blazor)
 
@@ -146,6 +231,8 @@ Open the URL printed in the console in a browser with Phantom installed (network
 
 > The Market account size (`MarketAccountSize = 376` in `SolanaService.cs`) is 8 + `Market::INIT_SPACE`. If you change the fields of the `Market` struct, update this number.
 
+---
+
 ## Usage
 
 1. Open the home page and click **Connect Phantom**.
@@ -155,19 +242,26 @@ Open the URL printed in the console in a browser with Phantom installed (network
 5. After the end time, the resolver (the wallet that created the market) picks the winner with **YES won** or **NO won**.
 6. Winners click **Redeem winnings** to get their tokens back.
 
-To test the full cycle quickly, create a market that ends in 5 to 10 minutes.
+💡 To test the full cycle quickly, create a market that ends in 5 to 10 minutes.
 
-## Known limitations
+---
+
+## Known Limitations
 
 - Devnet only, and the contract has not been audited.
 - No trading fee.
 - A single trusted resolver (the market creator), with no oracle or dispute process.
-- `claim_pool` (returning liquidity to the creator) exists in the contract but is not in the UI yet.
+- `claim_pool` exists in the contract but is not in the UI yet.
 - No automated contract tests; a manual run through the UI serves as the test.
 - No backend or indexer: the app reads data directly from Solana RPC, so there is no price history.
 
+---
+
 ## Roadmap
 
+- [x] Constant-product AMM market contract
+- [x] Buy, sell, resolve and redeem flow
+- [x] Phantom wallet integration
 - [ ] `claim_pool` button in the UI
 - [ ] Trading fee
 - [ ] Safer resolution (oracle / multisig / disputes)
@@ -176,13 +270,22 @@ To test the full cycle quickly, create a market that ends in 5 to 10 minutes.
 - [ ] Price charts and a portfolio page
 - [ ] Security audit before any use with real money
 
-## Useful links
+Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 
+---
+
+## Resources
+
+- [Project Presentation](#)
+- [Video Demo](#)
+- [Live Application](#)
 - [Solana docs](https://solana.com/docs)
 - [Anchor](https://www.anchor-lang.com/)
 - [Solnet](https://github.com/bmresearch/Solnet)
 - [Solana Explorer (devnet)](https://explorer.solana.com/?cluster=devnet)
 
+---
+
 ## License
 
-MIT (or choose your own)
+MIT — see [LICENSE](LICENSE)

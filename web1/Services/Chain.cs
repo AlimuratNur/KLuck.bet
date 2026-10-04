@@ -4,5 +4,5 @@ public class Chain
 {
     public const string ProgramId = "B3WpaPrLXRRnctaivRgwUBXdmGfcayZfKu4HqPHmH73i";
     public const string CollateralMint = "4aGqcQpUS9FSHwzz7nxAtFCHWaabwaz7TWed2hf2jzXa";
-    public const string ApiUrl = "http://localhost:5080";
+    public static string ApiUrl { get; set; } = "http://localhost:5080";
 }

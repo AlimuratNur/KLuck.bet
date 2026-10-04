@@ -3,6 +3,9 @@
 @using PolymarketApp.Services
 @inject WalletService Wallet
 @inject SolanaService Solana
+@inject ProfileService Profile
+@inject IJSRuntime JS
+@inject NavigationManager Nav
 
 <section class="k-hero">
     <h1>Bet on campus life.<br /><span class="k-grad">Settle it on-chain.</span></h1>
@@ -23,43 +26,40 @@
         }
         else
         {
-            <label>What are you betting on?</label>
-            <input class="k-input" maxlength="140" placeholder="Calculus final will be on December 10" @bind="title" />
+            <div class="k-feed">
+                @foreach (var b in Filtered)
+                {
+                    <article class="k-card k-post">
+                        <header class="k-post-head">
+                            <Avatar Address="@b.Creator" Emoji="@EmojiFor(b.Creator)" Size="44" />
+                            <div class="k-post-who">
+                                <div class="k-post-name">@NameFor(b.Creator)</div>
+                                <div class="k-muted k-post-sub">@b.PostedAgo · closes @b.CloseLocal.ToString("d MMM, HH:mm")</div>
+                            </div>
+                            <span class="k-chip k-chip-@b.StatusClass">@b.StatusText</span>
+                        </header>
 
-            <label>Joining closes</label>
-                <div class="k-quick" style="margin:0 0 .7rem">
-                <button class="k-chip" @onclick="() => SetClose(DateTime.Now.AddHours(1))">In 1 hour</button>
-                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(1).AddHours(12))">Tomorrow</button>
-                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(3).AddHours(12))">In 3 days</button>
-                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddDays(7).AddHours(12))">In 1 week</button>
-                <button class="k-chip" @onclick="() => SetClose(DateTime.Today.AddMonths(1).AddHours(12))">In 1 month</button>
-                </div>
-                <div class="k-form-row">
-                <input class="k-input" type="date" min="@DateTime.Today.ToString("yyyy-MM-dd")" @bind="closeDate" />
-                <select class="k-input" @bind="closeTime">
-                                              @foreach (var t in Times)
-            {
-                <option value="@t">@t</option>
-            }
-            </select>
-                </div>
-                <div class="k-when">Closes <strong>@CloseAt.ToString("ddd, d MMM yyyy 'at' HH:mm")</strong> (@Relative)</div>
+                        <a class="k-post-title" href="/bet/@b.Address">@b.Title</a>
 
-                <label>Your stake (tokens)</label>
-                <input class="k-input" type="number" min="1" @bind="stake" />
+                        <div class="k-split"><span class="k-yes">YES @b.YesPctText%</span><span class="k-no">NO @b.NoPctText%</span></div>
+                        <div class="k-bar"><div class="k-bar-yes" style="width:@(b.YesWidth)%"></div></div>
+                        <div class="k-post-stats k-muted">🪙 @SolanaService.Fmt(b.Total) in the pool</div>
 
-            <label>Your side</label>
-            <div class="k-seg">
-                <button class="yes @(side == 0 ? "active" : "")" @onclick="() => side = 0">YES</button>
-                <button class="no @(side == 1 ? "active" : "")" @onclick="() => side = 1">NO</button>
+                        <footer class="k-post-actions">
+                            @if (b.CanJoin)
+                            {
+                                <a class="k-act k-act-yes" href="/bet/@b.Address?side=0">Join YES</a>
+                                <a class="k-act k-act-no" href="/bet/@b.Address?side=1">Join NO</a>
+                            }
+                            else
+                            {
+                                <a class="k-act" href="/bet/@b.Address">View result</a>
+                            }
+                            <button class="k-act" @onclick="() => Share(b.Address)">🔗 Share</button>
+                        </footer>
+                    </article>
+                }
             </div>
-
-            <label>Judge wallet (decides the result)</label>
-            <input class="k-input" placeholder="Empty = you judge. A neutral friend is fairer." @bind="judge" />
-
-            <button class="k-btn k-btn-primary k-btn-block" style="margin-top:1.2rem" disabled="@busy" @onclick="Create">
-                @(busy ? "Waiting for wallet..." : "Create bet")
-            </button>
         }
     </div>
 }
@@ -207,5 +207,18 @@ else
         t = new DateTime((t.Ticks + step - 1) / step * step);
         closeDate = t.Date;
         closeTime = t.ToString("HH:mm");
+    }
+    
+    string NameFor(string creator) =>
+        creator == Wallet.Address
+            ? (string.IsNullOrWhiteSpace(Profile.Name) ? "You" : Profile.Name!)
+            : creator[..4] + "…" + creator[^4..];
+
+    string? EmojiFor(string creator) => creator == Wallet.Address ? Profile.Emoji : null;
+
+    async Task Share(string address)
+    {
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Nav.BaseUri + "bet/" + address);
+        msg = "Link copied. Send it to a friend!";
     }
 }

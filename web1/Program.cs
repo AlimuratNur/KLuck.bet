@@ -12,5 +12,6 @@ builder.Services.AddScoped(sp => new HttpClient { BaseAddress = new Uri(builder.
 builder.Services.AddSingleton(ClientFactory.GetClient(Cluster.DevNet));
 builder.Services.AddScoped<WalletService>();
 builder.Services.AddScoped<SolanaService>();
+builder.Services.AddScoped<ProfileService>();
 
 await builder.Build().RunAsync();

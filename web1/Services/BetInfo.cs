@@ -23,6 +23,20 @@ public record BetInfo(
     public bool WaitingForResult => Status == 0 && Now >= CloseTime;
     public DateTime CloseLocal => DateTimeOffset.FromUnixTimeSeconds(CloseTime).LocalDateTime;
 
+    public DateTime CreatedLocal => DateTimeOffset.FromUnixTimeMilliseconds((long)BetId).LocalDateTime;
+
+    public string PostedAgo
+    {
+        get
+        {
+            var d = DateTime.Now - CreatedLocal;
+            if (d.TotalMinutes < 1) return "just now";
+            if (d.TotalHours < 1) return $"{(int)d.TotalMinutes} min ago";
+            if (d.TotalDays < 1) return $"{(int)d.TotalHours} h ago";
+            return $"{(int)d.TotalDays} d ago";
+        }
+    }
+    
     public string StatusClass => Status != 0 ? "done" : (CanJoin ? "open" : "wait");
     public string StatusText => Status switch
     {

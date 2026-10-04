@@ -2,6 +2,9 @@
 @implements IDisposable
 @using PolymarketApp.Services
 @inject WalletService Wallet
+@inject ProfileService Profile
+@inject SolanaService Solana
+@inject IJSRuntime JS
 
 <header class="k-nav">
     <div class="k-nav-inner">
@@ -9,6 +12,7 @@
             <span class="k-logo">K</span>KLuck<span class="k-dot">.bet</span>
             <span class="k-badge">KBTU</span>
         </a>
+
         <div class="k-nav-right">
             @if (Wallet.Address is null)
             {
@@ -16,12 +20,60 @@
             }
             else
             {
-                <span class="k-wallet">@(Wallet.Address[..4] + "…" + Wallet.Address[^4..])</span>
-                <button class="k-btn k-btn-ghost" @onclick="Wallet.DisconnectAsync">Disconnect</button>
+                <span class="k-balance" title="Your test tokens">🪙 @SolanaService.Fmt(balance)</span>
+
+                <button class="k-me" @onclick="() => menuOpen = !menuOpen">
+                    <Avatar Address="@Wallet.Address" Emoji="@Profile.Emoji" Size="34" />
+                    <span class="k-me-name">@DisplayName</span>
+                </button>
+
+                @if (menuOpen)
+                {
+                    <div class="k-overlay" @onclick="() => menuOpen = false"></div>
+                    <div class="k-menu">
+                        <div class="k-menu-head">
+                            <Avatar Address="@Wallet.Address" Emoji="@Profile.Emoji" Size="48" />
+                            <div>
+                                <strong>@DisplayName</strong>
+                                <div class="k-muted" style="font-size:.8rem">@Short(Wallet.Address)</div>
+                            </div>
+                        </div>
+                        <button class="k-menu-item" @onclick="OpenEdit">✏️ Edit profile</button>
+                        <button class="k-menu-item" @onclick="CopyAddress">📋 Copy wallet address</button>
+                        <button class="k-menu-item" @onclick="Disconnect">🚪 Disconnect</button>
+                    </div>
+                }
             }
         </div>
     </div>
 </header>
+
+@if (editing && Wallet.Address is not null)
+{
+    <div class="k-modal" @onclick="() => editing = false">
+        <div class="k-card k-modal-card" @onclick="() => { }" @onclick:stopPropagation="true">
+            <h3>Edit profile</h3>
+            <div class="k-center"><Avatar Address="@Wallet.Address" Emoji="@editEmoji" Size="72" /></div>
+
+            <div class="k-label">Display name</div>
+            <input class="k-input" maxlength="24" placeholder="e.g. Aigerim" @bind="editName" @bind:event="oninput" />
+
+            <div class="k-label">Avatar</div>
+            <div class="k-emojis">
+                @foreach (var e in Emojis)
+                {
+                    <button class="k-emoji @(editEmoji == e ? "active" : "")" @onclick="() => editEmoji = e">@e</button>
+                }
+            </div>
+            <p class="k-hint">Your name and avatar are saved in this browser only, for now.</p>
+
+            <div class="k-modal-actions">
+                <button class="k-btn k-btn-ghost" @onclick="() => editing = false">Cancel</button>
+                <button class="k-btn k-btn-primary" @onclick="SaveProfile">Save</button>
+            </div>
+        </div>
+    </div>
+}
 
 <main class="k-main">
     @if (error is not null) { <div class="k-alert">@error</div> }
@@ -31,20 +83,85 @@
 <footer class="k-footer">Unofficial student project · devnet demo · test tokens only</footer>
 
 @code {
+    static readonly string[] Emojis =
+        { "😀", "😎", "🦊", "🐯", "🦄", "🎓", "🔥", "⚡", "🚀", "🎲", "🐼", "🦁" };
+
     string? error;
+    ulong balance;
+    bool menuOpen, editing;
+    string editName = "", editEmoji = "";
     Action? handler;
+    CancellationTokenSource? cts;
+
+    static string Short(string a) => a[..4] + "…" + a[^4..];
+    string DisplayName => string.IsNullOrWhiteSpace(Profile.Name) ? Short(Wallet.Address!) : Profile.Name!;
 
     protected override void OnInitialized()
     {
-        handler = () => InvokeAsync(StateHasChanged);
+        handler = () => InvokeAsync(OnWalletChanged);
         Wallet.Changed += handler;
+        cts = new CancellationTokenSource();
+        _ = PollAsync(cts.Token);
     }
 
-    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+    public void Dispose()
+    {
+        cts?.Cancel();
+        if (handler is not null) Wallet.Changed -= handler;
+    }
+
+    async Task OnWalletChanged()
+    {
+        if (Wallet.Address is null) { balance = 0; menuOpen = false; }
+        else { await Profile.LoadAsync(Wallet.Address); await RefreshBalance(); }
+        StateHasChanged();
+    }
+
+    async Task RefreshBalance()
+    {
+        if (Wallet.Address is null) return;
+        try { balance = await Solana.GetTokenBalanceAsync(Wallet.Address); } catch { }
+    }
+
+    async Task PollAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(8));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                await RefreshBalance();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
 
     async Task Connect()
     {
         try { error = null; await Wallet.ConnectAsync(); }
         catch (Exception e) { error = e.Message; }
+    }
+
+    async Task Disconnect() { menuOpen = false; await Wallet.DisconnectAsync(); }
+
+    async Task CopyAddress()
+    {
+        menuOpen = false;
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", Wallet.Address);
+    }
+
+    void OpenEdit()
+    {
+        menuOpen = false;
+        editName = Profile.Name ?? "";
+        editEmoji = Profile.Emoji ?? "";
+        editing = true;
+    }
+
+    async Task SaveProfile()
+    {
+        await Profile.SaveAsync(Wallet.Address!, editName.Trim(), editEmoji);
+        editing = false;
     }
 }

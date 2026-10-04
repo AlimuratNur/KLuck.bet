@@ -112,7 +112,8 @@ else
 
 @code {
     [Parameter] public string Address { get; set; } = "";
-
+    [SupplyParameterFromQuery(Name = "side")] public int? SideQuery { get; set; }
+    
     BetInfo? bet;
     PositionInfo pos = new(0, 0, false);
     int side;
@@ -154,7 +155,11 @@ else
         if (handler is not null) Wallet.Changed -= handler;
     }
 
-    protected override async Task OnParametersSetAsync() => await Reload();
+    protected override async Task OnParametersSetAsync()
+    {
+        if (SideQuery is 0 or 1) side = SideQuery.Value;
+        await Reload();
+    }
 
     async Task Reload()
     {

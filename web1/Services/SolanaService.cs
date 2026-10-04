@@ -182,4 +182,12 @@ public class SolanaService(IRpcClient rpc, WalletService wallet, IJSRuntime js)
         Array.Copy(msg, 0, tx, 65, msg.Length);
         return await js.InvokeAsync<string>("wallet.signAndSend", Convert.ToBase64String(tx), payer.Key);
     }
+    
+    public async Task<ulong> GetTokenBalanceAsync(string owner)
+    {
+        var ata = Ata(new PublicKey(owner), Mint);
+        var res = await rpc.GetTokenAccountBalanceAsync(ata.Key);
+        if (!res.WasSuccessful || res.Result?.Value is null) return 0;
+        return ulong.TryParse(res.Result.Value.Amount, out var v) ? v : 0;
+    }
 }

@@ -19,3 +19,4 @@ text
 server/bin/
 server/obj/
 server/*.db*
+publish/

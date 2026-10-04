@@ -5,7 +5,7 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
   "mainAssemblyName": "Polymarket.Client",
   "applicationEnvironment": "Development",
   "resources": {
-    "hash": "sha256-O05IzSutrLxkn6ufnCH22Yo46lhHGZk01HuWXQwcW0Y=",
+    "hash": "sha256-MdXfmDn+XyNHcqlza+8uWFRQG+7uZwR6iXrnCqQkc00=",
     "jsModuleNative": [
       {
         "name": "dotnet.native.b6l13xorvf.js"
@@ -1284,16 +1284,16 @@ var e=!1;const t=async()=>WebAssembly.validate(new Uint8Array([0,97,115,109,1,0,
       },
       {
         "virtualPath": "Polymarket.Client.wasm",
-        "name": "Polymarket.Client.kl1lqn809n.wasm",
-        "hash": "sha256-qG70Mm6rkjvnXz27MZiy5Q5TvmQml5VYbejX9sVBHjE=",
+        "name": "Polymarket.Client.i2aecj2wyb.wasm",
+        "hash": "sha256-egIs5HUeYp0to62yq70fTx8KbNp58wLL5FFooUlV1fU=",
         "cache": "force-cache"
       }
     ],
     "pdb": [
       {
         "virtualPath": "Polymarket.Client.pdb",
-        "name": "Polymarket.Client.0k5mcx5820.pdb",
-        "hash": "sha256-YDouAeY5SZrVFKYAumu8olCyqI+2zY1sNRHK47fe5Ig=",
+        "name": "Polymarket.Client.n3w2afuq0g.pdb",
+        "hash": "sha256-/apnn7k6iTPUOQGl6xCUGI+3lpT9T8NLtgniEJU4NxA=",
         "cache": "force-cache"
       }
     ],

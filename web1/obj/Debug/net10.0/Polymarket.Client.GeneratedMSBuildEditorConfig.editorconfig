@@ -32,6 +32,10 @@ build_property.EnableCodeStyleSeverity =
 build_metadata.AdditionalFiles.TargetPath = QXBwLnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[/home/alimurat/kluck-bet/web1/Layout/Avatar.razor]
+build_metadata.AdditionalFiles.TargetPath = TGF5b3V0L0F2YXRhci5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [/home/alimurat/kluck-bet/web1/Pages/Bet.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXMvQmV0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 

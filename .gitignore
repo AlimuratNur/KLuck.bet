@@ -20,3 +20,5 @@ server/bin/
 server/obj/
 server/*.db*
 publish/
+
+*faucet*.json

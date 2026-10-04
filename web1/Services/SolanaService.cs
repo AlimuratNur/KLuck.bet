@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.JSInterop;
@@ -10,74 +11,161 @@ using Solnet.Wallet;
 
 namespace PolymarketApp.Services;
 
+public record PositionInfo(ulong Yes, ulong No, bool Claimed);
+
 public class SolanaService(IRpcClient rpc, WalletService wallet, IJSRuntime js)
 {
     static readonly PublicKey Program = new(Chain.ProgramId);
     static readonly PublicKey Mint = new(Chain.CollateralMint);
-    public record PositionInfo(ulong Yes, ulong No);
+    const int BetAccountSize = 316; // 8 + Bet::INIT_SPACE
 
     public static ulong ToBase(decimal v) => (ulong)(v * 1_000_000m);
-    public static decimal FromBase(ulong v) => v / 1_000_000m;
-    const int MarketAccountSize = 376; // 8 + Market::INIT_SPACE
-    const int Decimals = 6;
-    
-    static PublicKey PositionPda(PublicKey market, PublicKey user)
+    public static string Fmt(ulong v) => (v / 1_000_000m).ToString("0.##", CultureInfo.InvariantCulture);
+
+    static byte[] Disc(string name) =>
+        SHA256.HashData(Encoding.UTF8.GetBytes($"global:{name}"))[..8];
+
+    static PublicKey Pda(params byte[][] seeds)
     {
-        PublicKey.TryFindProgramAddress(
-            new List<byte[]> { Encoding.UTF8.GetBytes("position"), market.KeyBytes, user.KeyBytes },
-            Program, out var pda, out _);
+        PublicKey.TryFindProgramAddress(seeds.ToList(), Program, out var pda, out _);
         return pda;
     }
+    static PublicKey BetPda(PublicKey creator, ulong id) =>
+        Pda(Encoding.UTF8.GetBytes("bet"), creator.KeyBytes, BitConverter.GetBytes(id));
+    static PublicKey VaultPda(PublicKey bet) => Pda(Encoding.UTF8.GetBytes("vault"), bet.KeyBytes);
+    static PublicKey PositionPda(PublicKey bet, PublicKey user) =>
+        Pda(Encoding.UTF8.GetBytes("position"), bet.KeyBytes, user.KeyBytes);
+    static PublicKey Ata(PublicKey owner, PublicKey mint) =>
+        AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(owner, mint);
 
-    static byte[] Disc(string ns, string name) =>
-        SHA256.HashData(Encoding.UTF8.GetBytes($"{ns}:{name}"))[..8];
+    // ---------- reading ----------
 
-    public async Task<List<MarketInfo>> GetMarketsAsync()
+    public async Task<List<BetInfo>> GetBetsAsync()
     {
-        var res = await rpc.GetProgramAccountsAsync(Chain.ProgramId, dataSize: MarketAccountSize);
+        var res = await rpc.GetProgramAccountsAsync(Chain.ProgramId, dataSize: BetAccountSize);
         if (!res.WasSuccessful) throw new Exception(res.Reason);
         return res.Result
-            .Select(a => MarketInfo.Decode(a.PublicKey, Convert.FromBase64String(a.Account.Data[0])))
-            .OrderByDescending(m => m.EndTime)
+            .Select(a => BetInfo.Decode(a.PublicKey, Convert.FromBase64String(a.Account.Data[0])))
+            .OrderByDescending(b => b.CloseTime)
             .ToList();
     }
 
-    public async Task<string> CreateMarketAsync(string question, long endUnix, decimal liquidity)
+    public async Task<BetInfo?> GetBetAsync(string address)
+    {
+        var res = await rpc.GetAccountInfoAsync(address);
+        if (!res.WasSuccessful || res.Result.Value is null) return null;
+        return BetInfo.Decode(address, Convert.FromBase64String(res.Result.Value.Data[0]));
+    }
+
+    public async Task<PositionInfo> GetPositionAsync(string bet, string owner)
+    {
+        var pda = PositionPda(new PublicKey(bet), new PublicKey(owner));
+        var res = await rpc.GetAccountInfoAsync(pda.Key);
+        if (!res.WasSuccessful || res.Result.Value is null) return new(0, 0, false);
+        var d = Convert.FromBase64String(res.Result.Value.Data[0]);
+        return new(BitConverter.ToUInt64(d, 72), BitConverter.ToUInt64(d, 80), d[88] == 1);
+    }
+
+    // ---------- writing ----------
+
+    public Task<string> CreateBetAsync(string title, long closeUnix, string resolver, int side, ulong stake)
     {
         var creator = new PublicKey(wallet.Address!);
-        var marketId = (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        var betId = (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        var bet = BetPda(creator, betId);
 
-        PublicKey.TryFindProgramAddress(
-            new List<byte[]> { Encoding.UTF8.GetBytes("market"), creator.KeyBytes, BitConverter.GetBytes(marketId) },
-            Program, out var market, out _);
-        PublicKey.TryFindProgramAddress(
-            new List<byte[]> { Encoding.UTF8.GetBytes("vault"), market.KeyBytes },
-            Program, out var vault, out _);
-        var creatorAta = AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(creator, Mint);
-
-        var amount = (ulong)(liquidity * (decimal)Math.Pow(10, Decimals));
-        var data = new BorshWriter()
-            .Raw(Disc("global", "create_market"))
-            .U64(marketId).Str(question).I64(endUnix).U64(amount)
+        var data = new BorshWriter().Raw(Disc("create_bet"))
+            .U64(betId).Str(title).I64(closeUnix).Key(resolver).U8((byte)side).U64(stake)
             .ToArray();
 
-        var createIx = new TransactionInstruction
+        var ix = new TransactionInstruction
         {
             ProgramId = Program.KeyBytes,
             Keys = new List<AccountMeta>
             {
                 AccountMeta.Writable(creator, true),
                 AccountMeta.ReadOnly(Mint, false),
-                AccountMeta.Writable(market, false),
-                AccountMeta.Writable(vault, false),
-                AccountMeta.Writable(creatorAta, false),
+                AccountMeta.Writable(bet, false),
+                AccountMeta.Writable(VaultPda(bet), false),
+                AccountMeta.Writable(PositionPda(bet, creator), false),
+                AccountMeta.Writable(Ata(creator, Mint), false),
                 AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
                 AccountMeta.ReadOnly(SystemProgram.ProgramIdKey, false),
             },
             Data = data
         };
+        return SendAsync(creator, ix);
+    }
 
-        return await SendAsync(creator, createIx);
+    public Task<string> JoinAsync(BetInfo b, int side, ulong amount)
+    {
+        var user = new PublicKey(wallet.Address!);
+        var bet = new PublicKey(b.Address);
+        var mint = new PublicKey(b.Mint);
+        var data = new BorshWriter().Raw(Disc("join_bet")).U8((byte)side).U64(amount).ToArray();
+
+        var ix = new TransactionInstruction
+        {
+            ProgramId = Program.KeyBytes,
+            Keys = new List<AccountMeta>
+            {
+                AccountMeta.Writable(user, true),
+                AccountMeta.Writable(bet, false),
+                AccountMeta.ReadOnly(mint, false),
+                AccountMeta.Writable(new PublicKey(b.Vault), false),
+                AccountMeta.Writable(Ata(user, mint), false),
+                AccountMeta.Writable(PositionPda(bet, user), false),
+                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
+                AccountMeta.ReadOnly(SystemProgram.ProgramIdKey, false),
+            },
+            Data = data
+        };
+        return SendAsync(user, ix);
+    }
+
+    public Task<string> ResolveAsync(BetInfo b, int winner) =>
+        JudgeAsync(b, new BorshWriter().Raw(Disc("resolve_bet")).U8((byte)winner).ToArray());
+
+    public Task<string> CancelAsync(BetInfo b) =>
+        JudgeAsync(b, new BorshWriter().Raw(Disc("cancel_bet")).ToArray());
+
+    Task<string> JudgeAsync(BetInfo b, byte[] data)
+    {
+        var user = new PublicKey(wallet.Address!);
+        var ix = new TransactionInstruction
+        {
+            ProgramId = Program.KeyBytes,
+            Keys = new List<AccountMeta>
+            {
+                AccountMeta.ReadOnly(user, true),
+                AccountMeta.Writable(new PublicKey(b.Address), false),
+            },
+            Data = data
+        };
+        return SendAsync(user, ix);
+    }
+
+    public Task<string> ClaimAsync(BetInfo b)
+    {
+        var user = new PublicKey(wallet.Address!);
+        var bet = new PublicKey(b.Address);
+        var mint = new PublicKey(b.Mint);
+        var ix = new TransactionInstruction
+        {
+            ProgramId = Program.KeyBytes,
+            Keys = new List<AccountMeta>
+            {
+                AccountMeta.ReadOnly(user, true),
+                AccountMeta.ReadOnly(bet, false),
+                AccountMeta.ReadOnly(mint, false),
+                AccountMeta.Writable(new PublicKey(b.Vault), false),
+                AccountMeta.Writable(Ata(user, mint), false),
+                AccountMeta.Writable(PositionPda(bet, user), false),
+                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
+            },
+            Data = new BorshWriter().Raw(Disc("claim")).ToArray()
+        };
+        return SendAsync(user, ix);
     }
 
     async Task<string> SendAsync(PublicKey payer, params TransactionInstruction[] ixs)
@@ -89,104 +177,9 @@ public class SolanaService(IRpcClient rpc, WalletService wallet, IJSRuntime js)
         foreach (var ix in ixs) builder.AddInstruction(ix);
         var msg = builder.CompileMessage();
 
-        // Unsigned transaction: 1 signature slot of 64 zero bytes + message. Phantom fills it in.
         var tx = new byte[1 + 64 + msg.Length];
         tx[0] = 1;
         Array.Copy(msg, 0, tx, 65, msg.Length);
-
         return await js.InvokeAsync<string>("wallet.signAndSend", Convert.ToBase64String(tx));
-    }
-    
-     public async Task<MarketInfo?> GetMarketAsync(string address)
-    {
-        var res = await rpc.GetAccountInfoAsync(address);
-        if (!res.WasSuccessful || res.Result.Value is null) return null;
-        return MarketInfo.Decode(address, Convert.FromBase64String(res.Result.Value.Data[0]));
-    }
-
-    public async Task<PositionInfo> GetPositionAsync(string market, string owner)
-    {
-        var pda = PositionPda(new PublicKey(market), new PublicKey(owner));
-        var res = await rpc.GetAccountInfoAsync(pda.Key);
-        if (!res.WasSuccessful || res.Result.Value is null) return new(0, 0);
-        var d = Convert.FromBase64String(res.Result.Value.Data[0]);
-        return new(BitConverter.ToUInt64(d, 72), BitConverter.ToUInt64(d, 80));
-    }
-
-    TransactionInstruction TradeIx(PublicKey user, MarketInfo m, byte[] data)
-    {
-        var market = new PublicKey(m.Address);
-        var mint = new PublicKey(m.Mint);
-        return new TransactionInstruction
-        {
-            ProgramId = Program.KeyBytes,
-            Keys = new List<AccountMeta>
-            {
-                AccountMeta.Writable(user, true),
-                AccountMeta.Writable(market, false),
-                AccountMeta.ReadOnly(mint, false),
-                AccountMeta.Writable(new PublicKey(m.Vault), false),
-                AccountMeta.Writable(AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(user, mint), false),
-                AccountMeta.Writable(PositionPda(market, user), false),
-                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
-                AccountMeta.ReadOnly(SystemProgram.ProgramIdKey, false),
-            },
-            Data = data
-        };
-    }
-
-    public Task<string> BuyAsync(MarketInfo m, int outcome, ulong amountIn, ulong minSharesOut)
-    {
-        var user = new PublicKey(wallet.Address!);
-        var data = new BorshWriter().Raw(Disc("global", "buy"))
-            .U8((byte)outcome).U64(amountIn).U64(minSharesOut).ToArray();
-        return SendAsync(user, TradeIx(user, m, data));
-    }
-
-    public Task<string> SellAsync(MarketInfo m, int outcome, ulong collateralOut, ulong maxSharesIn)
-    {
-        var user = new PublicKey(wallet.Address!);
-        var data = new BorshWriter().Raw(Disc("global", "sell"))
-            .U8((byte)outcome).U64(collateralOut).U64(maxSharesIn).ToArray();
-        return SendAsync(user, TradeIx(user, m, data));
-    }
-
-    public Task<string> ResolveAsync(MarketInfo m, int winningOutcome)
-    {
-        var user = new PublicKey(wallet.Address!);
-        var ix = new TransactionInstruction
-        {
-            ProgramId = Program.KeyBytes,
-            Keys = new List<AccountMeta>
-            {
-                AccountMeta.ReadOnly(user, true),
-                AccountMeta.Writable(new PublicKey(m.Address), false),
-            },
-            Data = new BorshWriter().Raw(Disc("global", "resolve_market")).U8((byte)winningOutcome).ToArray()
-        };
-        return SendAsync(user, ix);
-    }
-
-    public Task<string> RedeemAsync(MarketInfo m)
-    {
-        var user = new PublicKey(wallet.Address!);
-        var market = new PublicKey(m.Address);
-        var mint = new PublicKey(m.Mint);
-        var ix = new TransactionInstruction
-        {
-            ProgramId = Program.KeyBytes,
-            Keys = new List<AccountMeta>
-            {
-                AccountMeta.ReadOnly(user, true),
-                AccountMeta.ReadOnly(market, false),
-                AccountMeta.ReadOnly(mint, false),
-                AccountMeta.Writable(new PublicKey(m.Vault), false),
-                AccountMeta.Writable(AssociatedTokenAccountProgram.DeriveAssociatedTokenAccount(user, mint), false),
-                AccountMeta.Writable(PositionPda(market, user), false),
-                AccountMeta.ReadOnly(TokenProgram.ProgramIdKey, false),
-            },
-            Data = new BorshWriter().Raw(Disc("global", "redeem")).ToArray()
-        };
-        return SendAsync(user, ix);
     }
 }

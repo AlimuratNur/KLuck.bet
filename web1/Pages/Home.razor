@@ -100,6 +100,8 @@ else
     int side;
     string judge = "";
     Action? handler;
+    
+    CancellationTokenSource? cts;
 
     IEnumerable<BetInfo> Filtered => (bets ?? new()).Where(b => filter switch
     {
@@ -113,14 +115,39 @@ else
         handler = () => InvokeAsync(StateHasChanged);
         Wallet.Changed += handler;
         await Load();
+
+        cts = new CancellationTokenSource();
+        _ = PollAsync(cts.Token);
     }
 
-    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+    async Task PollAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (!busy) await Load(silent: true);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
 
-    async Task Load()
+    public void Dispose()
+    {
+        cts?.Cancel();
+        if (handler is not null) Wallet.Changed -= handler;
+    }
+
+    async Task Load(bool silent = false)
     {
         try { bets = await Solana.GetBetsAsync(); }
-        catch (Exception e) { msg = $"Could not load bets: {e.Message}"; bets = new(); }
+        catch (Exception e)
+        {
+            if (!silent) msg = $"Could not load bets: {e.Message}";
+            bets ??= new();
+        }
     }
 
     async Task Create()

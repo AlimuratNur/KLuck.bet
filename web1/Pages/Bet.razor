@@ -121,15 +121,38 @@ else
     string? msg, loadError;
     Action? handler;
 
+    CancellationTokenSource? cts;
+
     static string Short(string a) => a[..4] + "…" + a[^4..];
 
     protected override void OnInitialized()
     {
         handler = () => InvokeAsync(async () => { await LoadPosition(); StateHasChanged(); });
         Wallet.Changed += handler;
+
+        cts = new CancellationTokenSource();
+        _ = PollAsync(cts.Token);
     }
 
-    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+    async Task PollAsync(CancellationToken ct)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(8));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(ct))
+            {
+                if (!busy) await Reload();
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    public void Dispose()
+    {
+        cts?.Cancel();
+        if (handler is not null) Wallet.Changed -= handler;
+    }
 
     protected override async Task OnParametersSetAsync() => await Reload();
 

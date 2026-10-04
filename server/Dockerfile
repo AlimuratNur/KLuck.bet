@@ -8,5 +8,6 @@ RUN dotnet publish -c Release -o /app
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
+RUN mkdir -p /data
 ENV DB_PATH=/data/kluck.db
-ENTRYPOINT ["dotnet", "server.dll"]3
+ENTRYPOINT ["dotnet", "server.dll"]

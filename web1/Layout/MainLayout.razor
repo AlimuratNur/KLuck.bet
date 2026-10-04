@@ -203,19 +203,19 @@
     }
     
     string? info;
-    bool claiming;
+bool claiming;
 
-    async Task ClaimTokens()
+async Task ClaimTokens()
+{
+    try
     {
-        try
-        {
-            menuOpen = false; claiming = true; error = null; info = null;
-            var r = await Api.ClaimFaucetAsync();
-            info = $"You received {r.Tokens} test tokens" + (r.Sol ? " and a little SOL for fees." : ".");
-            await Task.Delay(4000);
-            await RefreshBalance();
-        }
-        catch (Exception e) { error = e.Message; }
-        finally { claiming = false; }
+        menuOpen = false; claiming = true; error = null; info = null;
+        var r = await Api.ClaimFaucetAsync();
+        info = $"You received {r.Tokens} test tokens" + (r.Sol ? " and a little SOL for fees." : ".");
+        await Task.Delay(4000);
+        await RefreshBalance();
     }
+    catch (Exception e) { error = e.Message; }
+    finally { claiming = false; }
+}
 }

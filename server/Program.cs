@@ -5,8 +5,16 @@ using Microsoft.EntityFrameworkCore;
 using Solnet.Wallet;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddDbContext<Db>(o => o.UseSqlite("Data Source=kluck.db"));
-builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+var dbPath = Environment.GetEnvironmentVariable("DB_PATH") ?? "kluck.db";
+builder.Services.AddDbContext<Db>(o => o.UseSqlite($"Data Source={dbPath}"));
+
+var origins = (Environment.GetEnvironmentVariable("ALLOWED_ORIGINS") ?? "")
+    .Split(',', StringSplitOptions.RemoveEmptyEntries);
+builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
+{
+    if (origins.Length == 0) p.AllowAnyOrigin(); else p.WithOrigins(origins);
+    p.AllowAnyHeader().AllowAnyMethod();
+}));
 
 var app = builder.Build();
 app.UseCors();
@@ -102,7 +110,8 @@ app.MapDelete("/api/comments/{id:int}", async (int id, HttpRequest req, Db db) =
     return Results.NoContent();
 });
 
-app.Run("http://localhost:5080");
+var port = Environment.GetEnvironmentVariable("PORT") ?? "5080";
+app.Run($"http://0.0.0.0:{port}");
 
 record AuthRequest(string Address, long Timestamp, string Signature);
 record ProfileBody(string? Name, string? Emoji);

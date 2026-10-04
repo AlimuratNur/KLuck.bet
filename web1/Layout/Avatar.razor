@@ -1,0 +1,24 @@
+<<span class="k-avatar" style="width:@(Size)px;height:@(Size)px;font-size:@((int)(Size * 0.45))px;background:@Gradient">@Symbol</span>
+
+@code {
+    [Parameter] public string Address { get; set; } = "";
+    [Parameter] public string? Emoji { get; set; }
+    [Parameter] public int Size { get; set; } = 40;
+
+    string Symbol => !string.IsNullOrEmpty(Emoji)
+        ? Emoji
+        : (Address.Length >= 2 ? Address[..2].ToUpperInvariant() : "?");
+
+    // The same address always gets the same colors, for everyone.
+    string Gradient
+    {
+        get
+        {
+            uint x = 17;
+            foreach (var c in Address) x = unchecked(x * 31 + c);
+            var h1 = (int)(x % 360);
+            var h2 = (h1 + 40) % 360;
+            return $"linear-gradient(135deg,hsl({h1} 80% 55%),hsl({h2} 80% 45%))";
+        }
+    }
+}

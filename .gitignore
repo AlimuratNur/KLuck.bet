@@ -15,3 +15,7 @@ web/obj/
 id.json
 .env
 text
+
+server/bin/
+server/obj/
+server/*.db*

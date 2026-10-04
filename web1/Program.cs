@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Polymarket.Client;
+using Polymarket.Client.Services;
 using PolymarketApp.Services;
 using Solnet.Rpc;
 
 var builder = WebAssemblyHostBuilder.CreateDefault(args);
+Polymarket.Client.Services.Chain.ApiUrl = builder.Configuration["ApiUrl"] ?? Polymarket.Client.Services.Chain.ApiUrl;
 builder.RootComponents.Add<App>("#app");
 builder.RootComponents.Add<HeadOutlet>("head::after");
 

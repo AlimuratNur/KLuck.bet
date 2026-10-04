@@ -16,6 +16,7 @@ public class BorshWriter
         return this;
     }
     public byte[] ToArray() => _b.ToArray();
-    
+
     public BorshWriter U8(byte v) { _b.Add(v); return this; }
+    public BorshWriter Key(string address) { _b.AddRange(new Solnet.Wallet.PublicKey(address).KeyBytes); return this; }
 }

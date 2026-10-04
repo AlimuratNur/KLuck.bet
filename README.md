@@ -276,7 +276,7 @@ Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 
 ## Resources
 
-- [Project Presentation](https://htmlpreview.github.io/?https://github.com/AlimuratNur/KLuck.bet/blob/main/assets/presentation.html)
+- [Project Presentation](https://htmlpreview.github.com/AlimuratNur/KLuck.bet/blob/Main/assets/presentation.html)
 - [Video Demo](#)
 - [Live Application](https://kluck-bet.vercel.app)
 - [Solana docs](https://solana.com/docs)

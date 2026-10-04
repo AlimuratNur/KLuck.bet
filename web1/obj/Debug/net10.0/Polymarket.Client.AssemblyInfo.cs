@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Polymarket.Client")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+55dd164c05eedb4886e6aaaaed45ba658a87485f")]
 [assembly: System.Reflection.AssemblyProductAttribute("Polymarket.Client")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Polymarket.Client")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

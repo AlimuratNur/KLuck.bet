@@ -14,3 +14,4 @@ web/obj/
 *.keypair.json
 id.json
 .env
+text

@@ -180,6 +180,6 @@ public class SolanaService(IRpcClient rpc, WalletService wallet, IJSRuntime js)
         var tx = new byte[1 + 64 + msg.Length];
         tx[0] = 1;
         Array.Copy(msg, 0, tx, 65, msg.Length);
-        return await js.InvokeAsync<string>("wallet.signAndSend", Convert.ToBase64String(tx));
+        return await js.InvokeAsync<string>("wallet.signAndSend", Convert.ToBase64String(tx), payer.Key);
     }
 }

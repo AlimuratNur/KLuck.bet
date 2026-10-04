@@ -1,16 +1,50 @@
 ﻿@inherits LayoutComponentBase
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@implements IDisposable
+@using PolymarketApp.Services
+@inject WalletService Wallet
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+<header class="k-nav">
+    <div class="k-nav-inner">
+        <a class="k-brand" href="/">
+            <span class="k-logo">K</span>KLuck<span class="k-dot">.bet</span>
+            <span class="k-badge">KBTU</span>
+        </a>
+        <div class="k-nav-right">
+            @if (Wallet.Address is null)
+            {
+                <button class="k-btn k-btn-primary" @onclick="Connect">Connect wallet</button>
+            }
+            else
+            {
+                <span class="k-wallet">@(Wallet.Address[..4] + "…" + Wallet.Address[^4..])</span>
+                <button class="k-btn k-btn-ghost" @onclick="Wallet.DisconnectAsync">Disconnect</button>
+            }
         </div>
+    </div>
+</header>
 
-        <article class="content px-4">
-            @Body
-        </article>
-    </main>
-</div>
+<main class="k-main">
+    @if (error is not null) { <div class="k-alert">@error</div> }
+    @Body
+</main>
+
+<footer class="k-footer">Unofficial student project · devnet demo · test tokens only</footer>
+
+@code {
+    string? error;
+    Action? handler;
+
+    protected override void OnInitialized()
+    {
+        handler = () => InvokeAsync(StateHasChanged);
+        Wallet.Changed += handler;
+    }
+
+    public void Dispose() { if (handler is not null) Wallet.Changed -= handler; }
+
+    async Task Connect()
+    {
+        try { error = null; await Wallet.ConnectAsync(); }
+        catch (Exception e) { error = e.Message; }
+    }
+}

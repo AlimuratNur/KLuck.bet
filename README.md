@@ -7,7 +7,7 @@
 
 > A Polymarket-inspired prediction market on Solana — create YES/NO markets, trade outcome shares through a constant-product AMM, and redeem winnings 1:1 after resolution. Transactions are signed in the browser; private keys never leave your wallet.
 
-[Live Demo](https://kluck-bet.vercel.app/) · [Video Walkthrough](#) · [Docs](docs/roadmap.md) · [Submission](#submission)
+[Live Demo](https://kluck-bet.vercel.app/) · [Video Walkthrough](https://youtu.be/8WfEkndGF9g?si=GaSliheax-yk10sp) · [Docs](docs/roadmap.md) · [Submission](#submission)
 
 > ⚠️ **Experimental.** This project has not been audited and must not be used with real money. Devnet only.
 
@@ -277,7 +277,7 @@ Full roadmap: [docs/roadmap.md](docs/roadmap.md)
 ## Resources
 
 - [Project Presentation](https://htmlpreview.github.io/?https://github.com/AlimuratNur/KLuck.bet/blob/Main/assets/presentation.html)
-- [Video Demo](#)
+- [Video Demo](https://youtu.be/8WfEkndGF9g?si=GaSliheax-yk10sp)
 - [Live Application](https://kluck-bet.vercel.app)
 - [Solana docs](https://solana.com/docs)
 - [Anchor](https://www.anchor-lang.com/)
